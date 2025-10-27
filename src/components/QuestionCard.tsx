@@ -117,10 +117,11 @@ export function QuestionCard({ question, index, onAnswer, isGraded, isCorrect }:
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: index * 0.1 }}
-      className="bg-card border border-border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow"
+      whileHover={{ y: -2 }}
+      className="bg-card border border-border rounded-xl p-6 shadow-md hover:shadow-lg transition-all"
     >
       <div className="flex items-start gap-3 mb-4">
-        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold">
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-primary-foreground font-semibold shadow-sm">
           {index + 1}
         </div>
         <div className="flex-1">

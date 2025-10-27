@@ -104,13 +104,13 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-muted/30">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
       {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
+      <header className="border-b border-border bg-card/80 backdrop-blur-md sticky top-0 z-10 shadow-sm">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <BookOpen className="w-6 h-6 text-primary" />
+            <div className="p-2 rounded-lg bg-gradient-to-br from-primary to-primary/80 shadow-md">
+              <BookOpen className="w-6 h-6 text-primary-foreground" />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-foreground">Quiz Runner</h1>
@@ -124,9 +124,9 @@ const Index = () => {
       <main className="container mx-auto px-4 py-8">
         {!quizData ? (
           // Input View
-          <div className="max-w-4xl mx-auto">
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
+          <div className="max-w-6xl mx-auto">
+            <div className="grid lg:grid-cols-2 gap-6">
+              <div className="bg-card border border-border rounded-xl p-6 shadow-md">
                 <QuizInput
                   value={quizText}
                   onChange={setQuizText}
@@ -139,25 +139,29 @@ const Index = () => {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.4, delay: 0.3 }}
-                  className="bg-card border border-border rounded-xl p-6 shadow-sm"
+                  className="bg-card border border-border rounded-xl p-6 shadow-md"
                 >
-                  <h3 className="text-lg font-semibold text-foreground mb-3">Supported Question Types</h3>
+                  <h3 className="text-lg font-semibold text-foreground mb-3">Supported Formats</h3>
                   <ul className="space-y-2 text-sm text-muted-foreground">
                     <li className="flex items-start gap-2">
                       <span className="text-primary">•</span>
-                      <span><strong className="text-foreground">Multiple Choice:</strong> Questions with options A-D</span>
+                      <span><strong className="text-foreground">Multiple Choice:</strong> Options with A. B. C. D. format</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-primary">•</span>
-                      <span><strong className="text-foreground">True/False:</strong> Questions with T/F or "true or false" in text</span>
+                      <span><strong className="text-foreground">True/False:</strong> Simple T/F questions</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-primary">•</span>
-                      <span><strong className="text-foreground">Fill in the Blank:</strong> Questions with underscores or "fill in"</span>
+                      <span><strong className="text-foreground">Fill-in-the-Blank:</strong> With ___ blanks</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-primary">•</span>
-                      <span><strong className="text-foreground">Match the Following:</strong> Questions with "match" keyword</span>
+                      <span><strong className="text-foreground">Match:</strong> Pair matching questions</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-primary">•</span>
+                      <span><strong className="text-foreground">Answer Key:</strong> Global or per-question</span>
                     </li>
                   </ul>
                 </motion.div>
@@ -171,7 +175,7 @@ const Index = () => {
               <motion.div
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex justify-between items-center bg-card border border-border rounded-xl p-4 shadow-sm"
+                className="flex justify-between items-center bg-card border border-border rounded-xl p-4 shadow-md"
               >
                 <div>
                   <p className="text-sm text-muted-foreground">Questions answered</p>

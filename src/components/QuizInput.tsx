@@ -19,8 +19,8 @@ export function QuizInput({ value, onChange, onParse, isDisabled }: QuizInputPro
       className="flex flex-col h-full"
     >
       <div className="flex items-center gap-3 mb-4">
-        <div className="p-2 rounded-lg bg-primary/10">
-          <FileText className="w-5 h-5 text-primary" />
+        <div className="p-2 rounded-lg bg-gradient-to-br from-primary to-primary/80 shadow-sm">
+          <FileText className="w-5 h-5 text-primary-foreground" />
         </div>
         <div>
           <h2 className="text-xl font-semibold text-foreground">Paste Your Quiz</h2>
@@ -31,8 +31,8 @@ export function QuizInput({ value, onChange, onParse, isDisabled }: QuizInputPro
       <Textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="1. What is 2+2?&#10;A) 3&#10;B) 4&#10;C) 5&#10;D) 6&#10;Answer: B&#10;&#10;2. The sky is blue. (True or False)&#10;Answer: True"
-        className="flex-1 min-h-[400px] resize-none font-mono text-sm"
+        placeholder="Question 1 of 5&#10;What is 2+2?&#10;A. 3&#10;B. 4&#10;C. 5&#10;D. 6&#10;Answer: B&#10;&#10;Question 2 of 5&#10;The sky is blue. (True or False)&#10;Answer: True"
+        className="flex-1 min-h-[400px] resize-none font-mono text-sm shadow-inner"
         disabled={isDisabled}
       />
 
