@@ -1,4 +1,5 @@
 export type QuestionType = 'mcq' | 'truefalse' | 'fillin' | 'match';
+export type QuizMode = 'practice' | 'test';
 
 export interface MCQOption {
   label: string;
@@ -12,6 +13,9 @@ export interface Question {
   options?: MCQOption[]; // For MCQ
   correctAnswer: string | string[]; // Single for most, array for match
   userAnswer?: string | string[];
+  isFlagged?: boolean;
+  isAnsweredCorrectly?: boolean; // For practice mode
+  explanation?: string; // Optional explanation
 }
 
 export interface QuizData {
@@ -27,4 +31,10 @@ export interface QuizResult {
     questionId: string;
     isCorrect: boolean;
   }[];
+}
+
+export interface QuizSettings {
+  mode: QuizMode;
+  timerEnabled: boolean;
+  timerMinutes: number;
 }

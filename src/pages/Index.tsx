@@ -1,37 +1,64 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { QuizInput } from '@/components/QuizInput';
 import { QuestionCard } from '@/components/QuestionCard';
 import { ResultsPanel } from '@/components/ResultsPanel';
 import { PromptBlock } from '@/components/PromptBlock';
+import { QuizSettings } from '@/components/QuizSettings';
+import { QuizTimer } from '@/components/QuizTimer';
+import { QuizProgress } from '@/components/QuizProgress';
 import { parseQuizText, gradeQuiz } from '@/utils/quizParser';
-import { Question, QuizData } from '@/types/quiz';
+import { Question, QuizData, QuizSettings as QuizSettingsType } from '@/types/quiz';
 import { Button } from '@/components/ui/button';
-import { BookOpen, CheckCircle } from 'lucide-react';
+import { BookOpen, CheckCircle, RotateCcw, Eye } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 const STORAGE_KEY = 'quiz-runner-text';
+const SETTINGS_KEY = 'quiz-runner-settings';
+
+const DEFAULT_SETTINGS: QuizSettingsType = {
+  mode: 'test',
+  timerEnabled: false,
+  timerMinutes: 10,
+};
 
 const Index = () => {
   const [quizText, setQuizText] = useState('');
   const [quizData, setQuizData] = useState<QuizData | null>(null);
   const [isGraded, setIsGraded] = useState(false);
   const [results, setResults] = useState<ReturnType<typeof gradeQuiz> | null>(null);
+  const [settings, setSettings] = useState<QuizSettingsType>(DEFAULT_SETTINGS);
+  const [reviewMode, setReviewMode] = useState(false);
+  const [timerStarted, setTimerStarted] = useState(false);
 
   // Load from localStorage on mount
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      setQuizText(saved);
+    const savedText = localStorage.getItem(STORAGE_KEY);
+    const savedSettings = localStorage.getItem(SETTINGS_KEY);
+    
+    if (savedText) {
+      setQuizText(savedText);
+    }
+    if (savedSettings) {
+      try {
+        setSettings(JSON.parse(savedSettings));
+      } catch (e) {
+        // Use defaults if parse fails
+      }
     }
   }, []);
 
-  // Save to localStorage when text changes
+  // Save text to localStorage
   useEffect(() => {
     if (quizText) {
       localStorage.setItem(STORAGE_KEY, quizText);
     }
   }, [quizText]);
+
+  // Save settings to localStorage
+  useEffect(() => {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  }, [settings]);
 
   const handleParse = () => {
     try {
@@ -47,6 +74,8 @@ const Index = () => {
       setQuizData(parsed);
       setIsGraded(false);
       setResults(null);
+      setReviewMode(false);
+      setTimerStarted(settings.timerEnabled);
       toast({
         title: 'Quiz parsed!',
         description: `Found ${parsed.questions.length} question${parsed.questions.length > 1 ? 's' : ''}`,
@@ -60,13 +89,43 @@ const Index = () => {
     }
   };
 
+  const checkAnswer = (questionId: string, answer: string | string[]): boolean => {
+    const question = quizData?.questions.find((q) => q.id === questionId);
+    if (!question) return false;
+
+    if (question.type === 'match' && Array.isArray(question.correctAnswer) && Array.isArray(answer)) {
+      return question.correctAnswer.length === answer.length &&
+             question.correctAnswer.every((ans, idx) => 
+               ans.toLowerCase().trim() === answer[idx]?.toLowerCase().trim()
+             );
+    } else if (typeof question.correctAnswer === 'string' && typeof answer === 'string') {
+      return question.correctAnswer.toLowerCase().trim() === answer.toLowerCase().trim();
+    }
+    return false;
+  };
+
   const handleAnswer = (questionId: string, answer: string | string[]) => {
+    if (!quizData) return;
+    
+    const isCorrect = settings.mode === 'practice' ? checkAnswer(questionId, answer) : undefined;
+
+    setQuizData({
+      ...quizData,
+      questions: quizData.questions.map((q) =>
+        q.id === questionId 
+          ? { ...q, userAnswer: answer, isAnsweredCorrectly: isCorrect } 
+          : q
+      ),
+    });
+  };
+
+  const handleFlag = (questionId: string) => {
     if (!quizData) return;
     
     setQuizData({
       ...quizData,
       questions: quizData.questions.map((q) =>
-        q.id === questionId ? { ...q, userAnswer: answer } : q
+        q.id === questionId ? { ...q, isFlagged: !q.isFlagged } : q
       ),
     });
   };
@@ -88,6 +147,7 @@ const Index = () => {
     const gradeResults = gradeQuiz(quizData.questions);
     setResults(gradeResults);
     setIsGraded(true);
+    setTimerStarted(false);
 
     toast({
       title: 'Quiz graded!',
@@ -95,27 +155,52 @@ const Index = () => {
     });
   };
 
+  const handleTimeUp = () => {
+    toast({
+      title: 'Time is up!',
+      description: 'Your quiz will be submitted automatically',
+      variant: 'destructive',
+    });
+    handleSubmit();
+  };
+
   const handleReset = () => {
     setQuizText('');
     setQuizData(null);
     setIsGraded(false);
     setResults(null);
+    setReviewMode(false);
+    setTimerStarted(false);
     localStorage.removeItem(STORAGE_KEY);
   };
+
+  const handleReviewWrong = () => {
+    setReviewMode(true);
+  };
+
+  const filteredQuestions = reviewMode && results
+    ? quizData?.questions.filter((q) => {
+        const result = results.answers.find((a) => a.questionId === q.id);
+        return result && !result.isCorrect;
+      }) || []
+    : quizData?.questions || [];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
       {/* Header */}
       <header className="border-b border-border bg-card/80 backdrop-blur-md sticky top-0 z-10 shadow-sm">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-gradient-to-br from-primary to-primary/80 shadow-md">
-              <BookOpen className="w-6 h-6 text-primary-foreground" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-primary to-primary/80 shadow-md">
+                <BookOpen className="w-6 h-6 text-primary-foreground" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-foreground">Quiz Runner</h1>
+                <p className="text-sm text-muted-foreground">Parse, practice, and grade your quizzes</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">Quiz Runner</h1>
-              <p className="text-sm text-muted-foreground">Parse, practice, and grade your quizzes</p>
-            </div>
+            {!quizData && <QuizSettings settings={settings} onChange={setSettings} />}
           </div>
         </div>
       </header>
@@ -170,48 +255,117 @@ const Index = () => {
           </div>
         ) : (
           // Quiz View
-          <div className="max-w-4xl mx-auto space-y-6">
-            {!isGraded && (
-              <motion.div
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex justify-between items-center bg-card border border-border rounded-xl p-4 shadow-md"
-              >
-                <div>
-                  <p className="text-sm text-muted-foreground">Questions answered</p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {quizData.questions.filter((q) => q.userAnswer).length} / {quizData.questions.length}
-                  </p>
-                </div>
-                <Button onClick={handleSubmit} size="lg">
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                  Submit Quiz
-                </Button>
-              </motion.div>
-            )}
+          <div className="max-w-6xl mx-auto space-y-6">
+            <div className="flex flex-col lg:flex-row gap-6">
+              {/* Left: Quiz Content */}
+              <div className="flex-1 space-y-6">
+                {!isGraded && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-card border border-border rounded-xl p-4 shadow-md"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div>
+                          <p className="text-sm text-muted-foreground">
+                            {settings.mode === 'practice' ? 'Practice Mode' : 'Test Mode'}
+                          </p>
+                          <p className="text-xl font-bold text-foreground">
+                            {quizData.questions.filter((q) => q.userAnswer).length} / {quizData.questions.length}
+                          </p>
+                        </div>
+                        {settings.timerEnabled && timerStarted && (
+                          <QuizTimer
+                            durationMinutes={settings.timerMinutes}
+                            onTimeUp={handleTimeUp}
+                            isPaused={false}
+                          />
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button onClick={handleReset} variant="outline" size="sm">
+                          <RotateCcw className="w-4 h-4 mr-2" />
+                          Reset
+                        </Button>
+                        {settings.mode === 'test' && (
+                          <Button onClick={handleSubmit} size="sm">
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                            Submit Quiz
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
 
-            {isGraded && results && (
-              <ResultsPanel
-                totalQuestions={results.totalQuestions}
-                correctAnswers={results.correctAnswers}
-                score={results.score}
-                onReset={handleReset}
-              />
-            )}
+                {isGraded && results && (
+                  <div className="space-y-4">
+                    <ResultsPanel
+                      totalQuestions={results.totalQuestions}
+                      correctAnswers={results.correctAnswers}
+                      score={results.score}
+                      onReset={handleReset}
+                    />
+                    {results.correctAnswers < results.totalQuestions && (
+                      <Button
+                        onClick={handleReviewWrong}
+                        variant="outline"
+                        className="w-full"
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        Review Incorrect Answers
+                      </Button>
+                    )}
+                  </div>
+                )}
 
-            <div className="space-y-4">
-              {quizData.questions.map((question, index) => (
-                <QuestionCard
-                  key={question.id}
-                  question={question}
-                  index={index}
-                  onAnswer={(answer) => handleAnswer(question.id, answer)}
-                  isGraded={isGraded}
-                  isCorrect={
-                    isGraded ? results?.answers.find((a) => a.questionId === question.id)?.isCorrect : undefined
-                  }
-                />
-              ))}
+                <AnimatePresence mode="wait">
+                  <div className="space-y-4">
+                    {reviewMode && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="bg-error/10 border border-error/20 rounded-lg p-4 mb-4"
+                      >
+                        <p className="text-sm font-semibold text-error">
+                          Reviewing {filteredQuestions.length} incorrect answer
+                          {filteredQuestions.length !== 1 ? 's' : ''}
+                        </p>
+                      </motion.div>
+                    )}
+                    {filteredQuestions.map((question, index) => (
+                      <QuestionCard
+                        key={question.id}
+                        question={question}
+                        index={index}
+                        onAnswer={(answer) => handleAnswer(question.id, answer)}
+                        onFlag={() => handleFlag(question.id)}
+                        isGraded={isGraded}
+                        isPracticeMode={settings.mode === 'practice'}
+                        showFeedback={!!question.userAnswer}
+                        isCorrect={
+                          isGraded ? results?.answers.find((a) => a.questionId === question.id)?.isCorrect : undefined
+                        }
+                      />
+                    ))}
+                  </div>
+                </AnimatePresence>
+              </div>
+
+              {/* Right: Progress Sidebar */}
+              {!isGraded && quizData && (
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="lg:w-80"
+                >
+                  <div className="sticky top-24 bg-card border border-border rounded-xl p-6 shadow-md">
+                    <h3 className="text-lg font-semibold text-foreground mb-4">Progress</h3>
+                    <QuizProgress questions={quizData.questions} />
+                  </div>
+                </motion.div>
+              )}
             </div>
           </div>
         )}
