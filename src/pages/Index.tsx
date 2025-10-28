@@ -4,6 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   BookOpen,
   CheckCircle,
+  ClipboardList,
   RotateCcw,
   Eye,
   Sparkles,
@@ -12,6 +13,12 @@ import {
   Zap,
   Wand2,
   Gauge,
+  PlayCircle,
+  Settings2,
+  Trophy,
+  Volume2,
+  VolumeX,
+  Info,
 } from 'lucide-react';
 import { QuizInput } from '@/components/QuizInput';
 import { QuestionCard } from '@/components/QuestionCard';
@@ -24,9 +31,13 @@ import { parseQuizText, gradeQuiz } from '@/utils/quizParser';
 import { Question, QuizData, QuizSettings as QuizSettingsType } from '@/types/quiz';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
+import { useInterfaceSounds } from '@/hooks/use-interface-sounds';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 const STORAGE_KEY = 'quiz-runner-text';
 const SETTINGS_KEY = 'quiz-runner-settings';
+const SOUND_PREF_KEY = 'quiz-runner-sound-enabled';
 
 const DEFAULT_SETTINGS: QuizSettingsType = {
   mode: 'test',
@@ -182,6 +193,7 @@ const Index = () => {
   useEffect(() => {
     const savedText = localStorage.getItem(STORAGE_KEY);
     const savedSettings = localStorage.getItem(SETTINGS_KEY);
+    const savedSoundPref = localStorage.getItem(SOUND_PREF_KEY);
 
     if (savedText) {
       setQuizText(savedText);
@@ -193,11 +205,16 @@ const Index = () => {
         // Ignore invalid settings payloads and continue with defaults.
       }
     }
+    if (savedSoundPref) {
+      setIsSoundEnabled(savedSoundPref !== 'false');
+    }
   }, []);
 
   useEffect(() => {
     if (quizText) {
       localStorage.setItem(STORAGE_KEY, quizText);
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
     }
   }, [quizText]);
 
@@ -282,6 +299,61 @@ const Index = () => {
   const handleAnswer = useCallback(
     (questionId: string, answer: string | string[]) => {
       const isPracticeMode = settings.mode === 'practice';
+      let interactionOutcome: 'none' | 'correct' | 'incorrect' | 'select' = 'none';
+
+      setQuizData((previous) => {
+        if (!previous) {
+          return previous;
+        }
+
+        let didUpdate = false;
+
+        const nextQuestions = previous.questions.map((question) => {
+          if (question.id !== questionId) {
+            return question;
+          }
+
+          didUpdate = true;
+          const evaluation = isPracticeMode ? evaluateAnswer(question, answer) : undefined;
+
+          if (isPracticeMode) {
+            interactionOutcome = evaluation ? 'correct' : 'incorrect';
+          } else {
+            interactionOutcome = 'select';
+          }
+
+          return {
+            ...question,
+            userAnswer: answer,
+            isAnsweredCorrectly: isPracticeMode ? evaluation : undefined,
+          };
+        });
+
+        if (!didUpdate) {
+          interactionOutcome = 'none';
+          return previous;
+        }
+
+        return {
+          ...previous,
+          questions: nextQuestions,
+        };
+      });
+
+      if (interactionOutcome === 'correct') {
+        playAnswerCorrect();
+      } else if (interactionOutcome === 'incorrect') {
+        playAnswerIncorrect();
+      } else if (interactionOutcome === 'select') {
+        playSelect();
+      }
+    },
+    [evaluateAnswer, playAnswerCorrect, playAnswerIncorrect, playSelect, settings.mode],
+  );
+
+  const handleFlag = useCallback(
+    (questionId: string) => {
+      let nextIsFlagged: boolean | null = null;
 
       setQuizData((previous) => {
         if (!previous) {
@@ -293,10 +365,12 @@ const Index = () => {
             return question;
           }
 
+          const toggled = !question.isFlagged;
+          nextIsFlagged = toggled;
+
           return {
             ...question,
-            userAnswer: answer,
-            isAnsweredCorrectly: isPracticeMode ? evaluateAnswer(question, answer) : undefined,
+            isFlagged: toggled,
           };
         });
 
@@ -305,24 +379,13 @@ const Index = () => {
           questions: nextQuestions,
         };
       });
-    },
-    [evaluateAnswer, settings.mode],
-  );
 
-  const handleFlag = useCallback((questionId: string) => {
-    setQuizData((previous) => {
-      if (!previous) {
-        return previous;
+      if (nextIsFlagged !== null) {
+        playFlag(nextIsFlagged);
       }
-
-      return {
-        ...previous,
-        questions: previous.questions.map((question) =>
-          question.id === questionId ? { ...question, isFlagged: !question.isFlagged } : question,
-        ),
-      };
-    });
-  }, []);
+    },
+    [playFlag],
+  );
 
   const handleSubmit = useCallback(() => {
     if (!quizData) {
@@ -332,6 +395,7 @@ const Index = () => {
     const unansweredCount = quizData.questions.filter((question) => !question.userAnswer).length;
 
     if (unansweredCount > 0) {
+      playError();
       toast({
         title: 'Incomplete quiz',
         description: `Please answer all questions (${unansweredCount} remaining).`,
@@ -345,11 +409,13 @@ const Index = () => {
     setIsGraded(true);
     setTimerStarted(false);
 
+    playAchievement();
+
     toast({
       title: 'Quiz graded!',
       description: `You scored ${gradeResults.score}%.`,
     });
-  }, [quizData]);
+  }, [playAchievement, playError, quizData]);
 
   const handleTimeUp = useCallback(() => {
     if (!quizData) {
@@ -360,11 +426,14 @@ const Index = () => {
     const gradeResults = gradeQuiz(quizData.questions);
     setResults(gradeResults);
     setTimerStarted(false);
+
+    playError();
+
     toast({
       title: 'Time is up',
       description: 'Your responses were submitted automatically.',
     });
-  }, [quizData]);
+  }, [playError, quizData]);
 
   const handleReset = useCallback(() => {
     if (parseTransitionTimeout.current) {
@@ -379,6 +448,7 @@ const Index = () => {
     setReviewMode(false);
     setTimerStarted(false);
     localStorage.removeItem(STORAGE_KEY);
+    playPrimary();
     toast({
       title: 'Workspace cleared',
       description: 'Start fresh or load the sample quiz to explore features faster.',
@@ -386,8 +456,9 @@ const Index = () => {
   }, [updateParseState]);
 
   const handleReviewWrong = useCallback(() => {
+    playSelect();
     setReviewMode(true);
-  }, []);
+  }, [playSelect]);
 
   const handleLoadSample = useCallback(() => {
     if (parseTransitionTimeout.current) {
@@ -401,6 +472,7 @@ const Index = () => {
     setResults(null);
     setReviewMode(false);
     setTimerStarted(false);
+    playPrimary();
     toast({
       title: 'Sample quiz loaded',
       description: 'Hit "Parse Quiz" to try the workflow with curated questions.',
@@ -458,6 +530,7 @@ const Index = () => {
   }, [quizData, isGraded, results, settings.mode]);
 
   const canReset = Boolean(quizText || quizData);
+  const SoundIcon = isSoundEnabled ? Volume2 : VolumeX;
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-b from-background via-background/95 to-background pb-16">
@@ -488,6 +561,18 @@ const Index = () => {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1.5 shadow-sm backdrop-blur">
+                <SoundIcon className="h-4 w-4 text-primary" aria-hidden="true" />
+                <Label htmlFor="sound-toggle" className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Sound
+                </Label>
+                <Switch
+                  id="sound-toggle"
+                  checked={isSoundEnabled}
+                  onCheckedChange={setIsSoundEnabled}
+                  aria-label="Toggle interface sound effects"
+                />
+              </div>
               <Button variant="ghost" size="sm" onClick={handleLoadSample}>
                 <Sparkles className="mr-2 h-4 w-4" />
                 Load demo quiz
@@ -616,6 +701,36 @@ const Index = () => {
                     <div className="mt-4">
                       <QuizSettings settings={settings} onChange={setSettings} />
                     </div>
+                  </motion.div>
+
+                  <motion.div
+                    layout
+                    className="glass-panel p-6"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="text-lg font-semibold text-foreground">How it works</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Four quick steps keep everyone aligned before you share the link.
+                        </p>
+                      </div>
+                      <Info className="h-5 w-5 text-primary" />
+                    </div>
+                    <ol className="mt-5 space-y-4">
+                      {QUICK_START_STEPS.map(({ icon: Icon, title, description }, index) => (
+                        <li key={title} className="flex items-start gap-3">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                            <Icon className="h-4 w-4" aria-hidden="true" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">
+                              Step {index + 1}: {title}
+                            </p>
+                            <p className="text-sm text-muted-foreground">{description}</p>
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
                   </motion.div>
                 </div>
               </div>
