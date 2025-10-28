@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import type { LucideIcon } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import type { LucideIcon } from "lucide-react";
 import {
   BookOpen,
   CheckCircle,
@@ -19,47 +19,58 @@ import {
   Volume2,
   VolumeX,
   Info,
-} from 'lucide-react';
-import { QuizInput } from '@/components/QuizInput';
-import { QuestionCard } from '@/components/QuestionCard';
-import { ResultsPanel } from '@/components/ResultsPanel';
-import { PromptBlock } from '@/components/PromptBlock';
-import { QuizSettings } from '@/components/QuizSettings';
-import { QuizTimer } from '@/components/QuizTimer';
-import { QuizProgress } from '@/components/QuizProgress';
-import { parseQuizText, gradeQuiz } from '@/utils/quizParser';
-import { Question, QuizData, QuizSettings as QuizSettingsType } from '@/types/quiz';
-import { Button } from '@/components/ui/button';
-import { toast } from '@/hooks/use-toast';
-import { useInterfaceSounds } from '@/hooks/use-interface-sounds';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
+} from "lucide-react";
+import { QuizInput } from "@/components/QuizInput";
+import { QuestionCard } from "@/components/QuestionCard";
+import { ResultsPanel } from "@/components/ResultsPanel";
+import { PromptBlock } from "@/components/PromptBlock";
+import { QuizSettings } from "@/components/QuizSettings";
+import { QuizTimer } from "@/components/QuizTimer";
+import { QuizProgress } from "@/components/QuizProgress";
+import { parseQuizText, gradeQuiz } from "@/utils/quizParser";
+import {
+  Question,
+  QuizData,
+  QuizSettings as QuizSettingsType,
+} from "@/types/quiz";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/hooks/use-toast";
+import { useInterfaceSounds } from "@/hooks/use-interface-sounds";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
-const STORAGE_KEY = 'quiz-runner-text';
-const SETTINGS_KEY = 'quiz-runner-settings';
-const SOUND_PREF_KEY = 'quiz-runner-sound-enabled';
+const STORAGE_KEY = "quiz-runner-text";
+const SETTINGS_KEY = "quiz-runner-settings";
+const SOUND_PREF_KEY = "quiz-runner-sound-enabled";
 
 const DEFAULT_SETTINGS: QuizSettingsType = {
-  mode: 'test',
+  mode: "test",
   timerEnabled: false,
   timerMinutes: 10,
 };
 
-const HERO_FEATURES: Array<{ icon: LucideIcon; title: string; description: string }> = [
+const HERO_FEATURES: Array<{
+  icon: LucideIcon;
+  title: string;
+  description: string;
+}> = [
   {
     icon: Wand2,
-    title: 'Paste anything',
-    description: 'Drop in classroom exams, certification drills, or AI-generated sets in seconds.',
+    title: "Paste anything",
+    description:
+      "Drop in classroom exams, certification drills, or AI-generated sets in seconds.",
   },
   {
     icon: Zap,
-    title: 'Adaptive practice',
-    description: 'Practice mode shows live feedback, while test mode keeps results until you submit.',
+    title: "Adaptive practice",
+    description:
+      "Practice mode shows live feedback, while test mode keeps results until you submit.",
   },
   {
     icon: Gauge,
-    title: 'Focus on mastery',
-    description: 'Flag tough questions, enable a timer, and review only the misses after grading.',
+    title: "Focus on mastery",
+    description:
+      "Flag tough questions, enable a timer, and review only the misses after grading.",
   },
 ];
 
@@ -102,15 +113,46 @@ C. Queue
 D. Graph
 Answer: C`;
 
+const QUICK_START_STEPS: Array<{
+  icon: LucideIcon;
+  title: string;
+  description: string;
+}> = [
+  {
+    icon: ClipboardList,
+    title: "Paste your quiz",
+    description:
+      "Copy any quiz text from exams, study guides, or AI-generated content.",
+  },
+  {
+    icon: CheckCircle,
+    title: "Parse questions",
+    description:
+      'Click "Parse Quiz" to automatically detect questions and answers.',
+  },
+  {
+    icon: Settings2,
+    title: "Choose mode",
+    description:
+      "Switch between practice mode (live feedback) or test mode (submit when ready).",
+  },
+  {
+    icon: PlayCircle,
+    title: "Start practicing",
+    description:
+      "Answer questions, flag difficult ones, and track your progress.",
+  },
+];
+
 type QuickStatCardProps = {
   icon: LucideIcon;
   label: string;
   value: string;
   hint?: string;
-  accent?: 'primary' | 'success' | 'warning';
+  accent?: "primary" | "success" | "warning";
 };
 
-type ParseState = 'idle' | 'parsing' | 'success' | 'error';
+type ParseState = "idle" | "parsing" | "success" | "error";
 
 const ctaContainerVariants = {
   hidden: { opacity: 0, y: 16 },
@@ -123,7 +165,12 @@ const ctaContainerVariants = {
 
 const ctaButtonVariants = {
   hidden: { opacity: 0, y: 20, scale: 0.95 },
-  visible: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 260, damping: 18 } },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { type: "spring", stiffness: 260, damping: 18 },
+  },
 };
 
 const featureCardVariants = {
@@ -131,17 +178,27 @@ const featureCardVariants = {
   visible: (index = 0) => ({
     opacity: 1,
     x: 0,
-    transition: { delay: 0.15 + index * 0.08, duration: 0.4, ease: 'easeOut' },
+    transition: { delay: 0.15 + index * 0.08, duration: 0.4, ease: "easeOut" },
   }),
 };
 
-const accentIconClasses: Record<NonNullable<QuickStatCardProps['accent']>, string> = {
-  primary: 'bg-primary/10 text-primary dark:bg-primary/15',
-  success: 'bg-success/10 text-success dark:bg-success/20',
-  warning: 'bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-200',
+const accentIconClasses: Record<
+  NonNullable<QuickStatCardProps["accent"]>,
+  string
+> = {
+  primary: "bg-primary/10 text-primary dark:bg-primary/15",
+  success: "bg-success/10 text-success dark:bg-success/20",
+  warning:
+    "bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-200",
 };
 
-const QuickStatCard = ({ icon: Icon, label, value, hint, accent = 'primary' }: QuickStatCardProps) => (
+const QuickStatCard = ({
+  icon: Icon,
+  label,
+  value,
+  hint,
+  accent = "primary",
+}: QuickStatCardProps) => (
   <motion.div
     initial={{ opacity: 0, y: 12 }}
     animate={{ opacity: 1, y: 0 }}
@@ -150,29 +207,51 @@ const QuickStatCard = ({ icon: Icon, label, value, hint, accent = 'primary' }: Q
   >
     <div className="absolute -top-16 right-0 h-24 w-24 rounded-full bg-primary/5 blur-3xl transition group-hover:bg-primary/10" />
     <div className="relative flex items-start gap-4">
-      <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${accentIconClasses[accent]}`}>
+      <div
+        className={`flex h-11 w-11 items-center justify-center rounded-xl ${accentIconClasses[accent]}`}
+      >
         <Icon className="h-5 w-5" />
       </div>
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground/80">{label}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground/80">
+          {label}
+        </p>
         <p className="text-xl font-semibold text-foreground">{value}</p>
-        {hint ? <p className="mt-1 text-sm text-muted-foreground">{hint}</p> : null}
+        {hint ? (
+          <p className="mt-1 text-sm text-muted-foreground">{hint}</p>
+        ) : null}
       </div>
     </div>
   </motion.div>
 );
 
 const Index = () => {
-  const [quizText, setQuizText] = useState('');
+  const [quizText, setQuizText] = useState("");
   const [quizData, setQuizData] = useState<QuizData | null>(null);
   const [isGraded, setIsGraded] = useState(false);
-  const [results, setResults] = useState<ReturnType<typeof gradeQuiz> | null>(null);
+  const [results, setResults] = useState<ReturnType<typeof gradeQuiz> | null>(
+    null
+  );
   const [settings, setSettings] = useState<QuizSettingsType>(DEFAULT_SETTINGS);
   const [reviewMode, setReviewMode] = useState(false);
   const [timerStarted, setTimerStarted] = useState(false);
-  const [parseState, setParseState] = useState<ParseState>('idle');
+  const [parseState, setParseState] = useState<ParseState>("idle");
+  const [isSoundEnabled, setIsSoundEnabled] = useState(true);
   const parseStateTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const parseTransitionTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const parseTransitionTimeout = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+
+  const {
+    playPrimary,
+    playSuccess,
+    playError,
+    playSelect,
+    playAnswerCorrect,
+    playAnswerIncorrect,
+    playFlag,
+    playAchievement,
+  } = useInterfaceSounds({ muted: !isSoundEnabled });
 
   const updateParseState = useCallback((state: ParseState) => {
     setParseState(state);
@@ -182,9 +261,9 @@ const Index = () => {
       parseStateTimeout.current = null;
     }
 
-    if (state === 'success' || state === 'error') {
+    if (state === "success" || state === "error") {
       parseStateTimeout.current = setTimeout(() => {
-        setParseState('idle');
+        setParseState("idle");
         parseStateTimeout.current = null;
       }, 2200);
     }
@@ -206,7 +285,7 @@ const Index = () => {
       }
     }
     if (savedSoundPref) {
-      setIsSoundEnabled(savedSoundPref !== 'false');
+      setIsSoundEnabled(savedSoundPref !== "false");
     }
   }, []);
 
@@ -239,22 +318,22 @@ const Index = () => {
       parseTransitionTimeout.current = null;
     }
 
-    updateParseState('parsing');
+    updateParseState("parsing");
 
     try {
       const parsed = parseQuizText(quizText);
 
       if (parsed.questions.length === 0) {
-        updateParseState('error');
+        updateParseState("error");
         toast({
-          title: 'No questions found',
-          description: 'Please check your quiz format and try again.',
-          variant: 'destructive',
+          title: "No questions found",
+          description: "Please check your quiz format and try again.",
+          variant: "destructive",
         });
         return;
       }
 
-      updateParseState('success');
+      updateParseState("success");
       parseTransitionTimeout.current = setTimeout(() => {
         setQuizData(parsed);
         setIsGraded(false);
@@ -265,41 +344,60 @@ const Index = () => {
       }, 320);
 
       toast({
-        title: 'Quiz ready!',
-        description: `Loaded ${parsed.questions.length} question${parsed.questions.length > 1 ? 's' : ''}.`,
+        title: "Quiz ready!",
+        description: `Loaded ${parsed.questions.length} question${
+          parsed.questions.length > 1 ? "s" : ""
+        }.`,
       });
     } catch (error) {
-      updateParseState('error');
+      updateParseState("error");
       toast({
-        title: 'Parse error',
-        description: 'Failed to understand the quiz text. Double-check the format.',
-        variant: 'destructive',
+        title: "Parse error",
+        description:
+          "Failed to understand the quiz text. Double-check the format.",
+        variant: "destructive",
       });
     }
   }, [quizText, settings.timerEnabled, updateParseState]);
 
-  const evaluateAnswer = useCallback((question: Question, answer: string | string[]): boolean => {
-    if (question.type === 'match' && Array.isArray(question.correctAnswer) && Array.isArray(answer)) {
-      if (question.correctAnswer.length !== answer.length) {
-        return false;
+  const evaluateAnswer = useCallback(
+    (question: Question, answer: string | string[]): boolean => {
+      if (
+        question.type === "match" &&
+        Array.isArray(question.correctAnswer) &&
+        Array.isArray(answer)
+      ) {
+        if (question.correctAnswer.length !== answer.length) {
+          return false;
+        }
+
+        return question.correctAnswer.every(
+          (expected, index) =>
+            expected.toLowerCase().trim() ===
+            answer[index]?.toLowerCase().trim()
+        );
       }
 
-      return question.correctAnswer.every(
-        (expected, index) => expected.toLowerCase().trim() === answer[index]?.toLowerCase().trim(),
-      );
-    }
+      if (
+        typeof question.correctAnswer === "string" &&
+        typeof answer === "string"
+      ) {
+        return (
+          question.correctAnswer.toLowerCase().trim() ===
+          answer.toLowerCase().trim()
+        );
+      }
 
-    if (typeof question.correctAnswer === 'string' && typeof answer === 'string') {
-      return question.correctAnswer.toLowerCase().trim() === answer.toLowerCase().trim();
-    }
-
-    return false;
-  }, []);
+      return false;
+    },
+    []
+  );
 
   const handleAnswer = useCallback(
     (questionId: string, answer: string | string[]) => {
-      const isPracticeMode = settings.mode === 'practice';
-      let interactionOutcome: 'none' | 'correct' | 'incorrect' | 'select' = 'none';
+      const isPracticeMode = settings.mode === "practice";
+      let interactionOutcome: "none" | "correct" | "incorrect" | "select" =
+        "none";
 
       setQuizData((previous) => {
         if (!previous) {
@@ -314,12 +412,14 @@ const Index = () => {
           }
 
           didUpdate = true;
-          const evaluation = isPracticeMode ? evaluateAnswer(question, answer) : undefined;
+          const evaluation = isPracticeMode
+            ? evaluateAnswer(question, answer)
+            : undefined;
 
           if (isPracticeMode) {
-            interactionOutcome = evaluation ? 'correct' : 'incorrect';
+            interactionOutcome = evaluation ? "correct" : "incorrect";
           } else {
-            interactionOutcome = 'select';
+            interactionOutcome = "select";
           }
 
           return {
@@ -330,7 +430,7 @@ const Index = () => {
         });
 
         if (!didUpdate) {
-          interactionOutcome = 'none';
+          interactionOutcome = "none";
           return previous;
         }
 
@@ -340,15 +440,21 @@ const Index = () => {
         };
       });
 
-      if (interactionOutcome === 'correct') {
+      if (interactionOutcome === "correct") {
         playAnswerCorrect();
-      } else if (interactionOutcome === 'incorrect') {
+      } else if (interactionOutcome === "incorrect") {
         playAnswerIncorrect();
-      } else if (interactionOutcome === 'select') {
+      } else if (interactionOutcome === "select") {
         playSelect();
       }
     },
-    [evaluateAnswer, playAnswerCorrect, playAnswerIncorrect, playSelect, settings.mode],
+    [
+      evaluateAnswer,
+      playAnswerCorrect,
+      playAnswerIncorrect,
+      playSelect,
+      settings.mode,
+    ]
   );
 
   const handleFlag = useCallback(
@@ -384,7 +490,7 @@ const Index = () => {
         playFlag(nextIsFlagged);
       }
     },
-    [playFlag],
+    [playFlag]
   );
 
   const handleSubmit = useCallback(() => {
@@ -392,14 +498,16 @@ const Index = () => {
       return;
     }
 
-    const unansweredCount = quizData.questions.filter((question) => !question.userAnswer).length;
+    const unansweredCount = quizData.questions.filter(
+      (question) => !question.userAnswer
+    ).length;
 
     if (unansweredCount > 0) {
       playError();
       toast({
-        title: 'Incomplete quiz',
+        title: "Incomplete quiz",
         description: `Please answer all questions (${unansweredCount} remaining).`,
-        variant: 'destructive',
+        variant: "destructive",
       });
       return;
     }
@@ -412,7 +520,7 @@ const Index = () => {
     playAchievement();
 
     toast({
-      title: 'Quiz graded!',
+      title: "Quiz graded!",
       description: `You scored ${gradeResults.score}%.`,
     });
   }, [playAchievement, playError, quizData]);
@@ -430,8 +538,8 @@ const Index = () => {
     playError();
 
     toast({
-      title: 'Time is up',
-      description: 'Your responses were submitted automatically.',
+      title: "Time is up",
+      description: "Your responses were submitted automatically.",
     });
   }, [playError, quizData]);
 
@@ -440,8 +548,8 @@ const Index = () => {
       clearTimeout(parseTransitionTimeout.current);
       parseTransitionTimeout.current = null;
     }
-    updateParseState('idle');
-    setQuizText('');
+    updateParseState("idle");
+    setQuizText("");
     setQuizData(null);
     setIsGraded(false);
     setResults(null);
@@ -450,10 +558,11 @@ const Index = () => {
     localStorage.removeItem(STORAGE_KEY);
     playPrimary();
     toast({
-      title: 'Workspace cleared',
-      description: 'Start fresh or load the sample quiz to explore features faster.',
+      title: "Workspace cleared",
+      description:
+        "Start fresh or load the sample quiz to explore features faster.",
     });
-  }, [updateParseState]);
+  }, [updateParseState, playPrimary]);
 
   const handleReviewWrong = useCallback(() => {
     playSelect();
@@ -465,7 +574,7 @@ const Index = () => {
       clearTimeout(parseTransitionTimeout.current);
       parseTransitionTimeout.current = null;
     }
-    updateParseState('idle');
+    updateParseState("idle");
     setQuizText(SAMPLE_QUIZ);
     setQuizData(null);
     setIsGraded(false);
@@ -474,10 +583,11 @@ const Index = () => {
     setTimerStarted(false);
     playPrimary();
     toast({
-      title: 'Sample quiz loaded',
-      description: 'Hit "Parse Quiz" to try the workflow with curated questions.',
+      title: "Sample quiz loaded",
+      description:
+        'Hit "Parse Quiz" to try the workflow with curated questions.',
     });
-  }, [updateParseState]);
+  }, [updateParseState, playPrimary]);
 
   const filteredQuestions = useMemo<Question[]>(() => {
     if (!quizData) {
@@ -486,7 +596,9 @@ const Index = () => {
 
     if (reviewMode && results) {
       return quizData.questions.filter((question) => {
-        const answer = results.answers.find((entry) => entry.questionId === question.id);
+        const answer = results.answers.find(
+          (entry) => entry.questionId === question.id
+        );
         return answer && !answer.isCorrect;
       });
     }
@@ -498,7 +610,10 @@ const Index = () => {
     if (!quizData) {
       return 0;
     }
-    return quizData.questions.reduce((count, question) => count + (question.userAnswer ? 1 : 0), 0);
+    return quizData.questions.reduce(
+      (count, question) => count + (question.userAnswer ? 1 : 0),
+      0
+    );
   }, [quizData]);
 
   const flaggedCount = useMemo(() => {
@@ -509,7 +624,9 @@ const Index = () => {
   }, [quizData]);
 
   const totalQuestions = quizData?.questions.length ?? 0;
-  const completionPercent = totalQuestions ? Math.round((answeredCount / totalQuestions) * 100) : 0;
+  const completionPercent = totalQuestions
+    ? Math.round((answeredCount / totalQuestions) * 100)
+    : 0;
 
   const accuracyPercent = useMemo(() => {
     if (!quizData) {
@@ -518,12 +635,16 @@ const Index = () => {
     if (isGraded && results) {
       return results.score;
     }
-    if (settings.mode === 'practice') {
-      const attempted = quizData.questions.filter((question) => question.userAnswer).length;
+    if (settings.mode === "practice") {
+      const attempted = quizData.questions.filter(
+        (question) => question.userAnswer
+      ).length;
       if (!attempted) {
         return null;
       }
-      const correct = quizData.questions.filter((question) => question.isAnsweredCorrectly).length;
+      const correct = quizData.questions.filter(
+        (question) => question.isAnsweredCorrectly
+      ).length;
       return Math.round((correct / attempted) * 100);
     }
     return null;
@@ -538,7 +659,7 @@ const Index = () => {
         className="pointer-events-none absolute -top-32 left-1/2 h-72 w-[640px] -translate-x-1/2 rounded-[50%] bg-primary/20 blur-3xl"
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.8, ease: 'easeOut' }}
+        transition={{ duration: 0.8, ease: "easeOut" }}
       />
       <motion.div
         className="pointer-events-none absolute -bottom-24 right-12 h-80 w-80 rounded-full bg-primary/10 blur-3xl"
@@ -555,15 +676,25 @@ const Index = () => {
                 QR
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary/80">Quiz Runner</p>
-                <p className="text-sm text-muted-foreground">Transform pasted exams into a polished practice hub.</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary/80">
+                  Quiz Runner
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Transform pasted exams into a polished practice hub.
+                </p>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1.5 shadow-sm backdrop-blur">
-                <SoundIcon className="h-4 w-4 text-primary" aria-hidden="true" />
-                <Label htmlFor="sound-toggle" className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                <SoundIcon
+                  className="h-4 w-4 text-primary"
+                  aria-hidden="true"
+                />
+                <Label
+                  htmlFor="sound-toggle"
+                  className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground"
+                >
                   Sound
                 </Label>
                 <Switch
@@ -578,7 +709,12 @@ const Index = () => {
                 Load demo quiz
               </Button>
               <QuizSettings settings={settings} onChange={setSettings} />
-              <Button variant="outline" size="sm" onClick={handleReset} disabled={!canReset}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleReset}
+                disabled={!canReset}
+              >
                 <RotateCcw className="mr-2 h-4 w-4" />
                 Reset
               </Button>
@@ -615,7 +751,8 @@ const Index = () => {
                       </span>
                     </h1>
                     <p className="max-w-2xl text-base text-muted-foreground sm:text-lg">
-                      Auto-saved drafts, timer support, review mode, and animated question cards keep study sessions smooth,
+                      Auto-saved drafts, timer support, review mode, and
+                      animated question cards keep study sessions smooth,
                       modern, and focused on mastery.
                     </p>
                     <motion.div
@@ -635,7 +772,9 @@ const Index = () => {
                           size="lg"
                           variant="outline"
                           onClick={handleParse}
-                          disabled={!quizText.trim() || parseState === 'parsing'}
+                          disabled={
+                            !quizText.trim() || parseState === "parsing"
+                          }
                         >
                           <CheckCircle className="mr-2 h-4 w-4" />
                           Parse current quiz
@@ -644,30 +783,39 @@ const Index = () => {
                     </motion.div>
                   </div>
                   <div className="space-y-4">
-                    {HERO_FEATURES.map(({ icon: Icon, title, description }, index) => (
-                      <motion.div
-                        key={title}
-                        custom={index}
-                        variants={featureCardVariants}
-                        initial="hidden"
-                        animate="visible"
-                        className="glass-panel-muted flex items-start gap-3 border-border/40 px-4 py-3"
-                      >
-                        <div className="mt-1 flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
-                          <Icon className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">{title}</p>
-                          <p className="text-sm text-muted-foreground">{description}</p>
-                        </div>
-                      </motion.div>
-                    ))}
+                    {HERO_FEATURES.map(
+                      ({ icon: Icon, title, description }, index) => (
+                        <motion.div
+                          key={title}
+                          custom={index}
+                          variants={featureCardVariants}
+                          initial="hidden"
+                          animate="visible"
+                          className="glass-panel-muted flex items-start gap-3 border-border/40 px-4 py-3"
+                        >
+                          <div className="mt-1 flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
+                            <Icon className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">
+                              {title}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {description}
+                            </p>
+                          </div>
+                        </motion.div>
+                      )
+                    )}
                   </div>
                 </div>
               </motion.section>
 
               <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
-                <motion.div layout className="relative overflow-hidden glass-panel p-6">
+                <motion.div
+                  layout
+                  className="relative overflow-hidden glass-panel p-6"
+                >
                   <QuizInput
                     value={quizText}
                     onChange={setQuizText}
@@ -678,10 +826,7 @@ const Index = () => {
                 </motion.div>
 
                 <div className="space-y-6">
-                  <motion.div
-                    layout
-                    className="glass-panel p-6"
-                  >
+                  <motion.div layout className="glass-panel p-6">
                     <PromptBlock />
                   </motion.div>
 
@@ -691,45 +836,55 @@ const Index = () => {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <h3 className="text-lg font-semibold text-foreground">Tune your run</h3>
+                        <h3 className="text-lg font-semibold text-foreground">
+                          Tune your run
+                        </h3>
                         <p className="text-sm text-muted-foreground">
-                          Switch between practice and test mode, or add a countdown timer before parsing.
+                          Switch between practice and test mode, or add a
+                          countdown timer before parsing.
                         </p>
                       </div>
                       <Zap className="h-5 w-5 text-primary" />
                     </div>
                     <div className="mt-4">
-                      <QuizSettings settings={settings} onChange={setSettings} />
+                      <QuizSettings
+                        settings={settings}
+                        onChange={setSettings}
+                      />
                     </div>
                   </motion.div>
 
-                  <motion.div
-                    layout
-                    className="glass-panel p-6"
-                  >
+                  <motion.div layout className="glass-panel p-6">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <h3 className="text-lg font-semibold text-foreground">How it works</h3>
+                        <h3 className="text-lg font-semibold text-foreground">
+                          How it works
+                        </h3>
                         <p className="text-sm text-muted-foreground">
-                          Four quick steps keep everyone aligned before you share the link.
+                          Four quick steps keep everyone aligned before you
+                          share the link.
                         </p>
                       </div>
                       <Info className="h-5 w-5 text-primary" />
                     </div>
                     <ol className="mt-5 space-y-4">
-                      {QUICK_START_STEPS.map(({ icon: Icon, title, description }, index) => (
-                        <li key={title} className="flex items-start gap-3">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                            <Icon className="h-4 w-4" aria-hidden="true" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-semibold text-foreground">
-                              Step {index + 1}: {title}
-                            </p>
-                            <p className="text-sm text-muted-foreground">{description}</p>
-                          </div>
-                        </li>
-                      ))}
+                      {QUICK_START_STEPS.map(
+                        ({ icon: Icon, title, description }, index) => (
+                          <li key={title} className="flex items-start gap-3">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                              <Icon className="h-4 w-4" aria-hidden="true" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-foreground">
+                                Step {index + 1}: {title}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {description}
+                              </p>
+                            </div>
+                          </li>
+                        )
+                      )}
                     </ol>
                   </motion.div>
                 </div>
@@ -742,27 +897,41 @@ const Index = () => {
                   icon={BookOpen}
                   label="Progress"
                   value={`${answeredCount}/${totalQuestions}`}
-                  hint={totalQuestions ? `${completionPercent}% complete` : 'Awaiting responses'}
+                  hint={
+                    totalQuestions
+                      ? `${completionPercent}% complete`
+                      : "Awaiting responses"
+                  }
                 />
                 <QuickStatCard
                   icon={TimerIcon}
                   label="Timer"
                   value={
                     settings.timerEnabled
-                      ? `${settings.timerMinutes} minute${settings.timerMinutes === 1 ? '' : 's'}`
-                      : 'Timer off'
+                      ? `${settings.timerMinutes} minute${
+                          settings.timerMinutes === 1 ? "" : "s"
+                        }`
+                      : "Timer off"
                   }
                   hint={
-                    settings.timerEnabled ? (timerStarted ? 'Counting down' : 'Paused') : 'Enable the timer in settings'
+                    settings.timerEnabled
+                      ? timerStarted
+                        ? "Counting down"
+                        : "Paused"
+                      : "Enable the timer in settings"
                   }
-                  accent={settings.timerEnabled ? 'warning' : 'primary'}
+                  accent={settings.timerEnabled ? "warning" : "primary"}
                 />
                 <QuickStatCard
                   icon={Flag}
                   label="Flags"
-                  value={flaggedCount ? `${flaggedCount}` : 'None'}
-                  hint={flaggedCount ? 'Review flagged questions later' : 'Mark questions to revisit'}
-                  accent={flaggedCount ? 'primary' : 'success'}
+                  value={flaggedCount ? `${flaggedCount}` : "None"}
+                  hint={
+                    flaggedCount
+                      ? "Review flagged questions later"
+                      : "Mark questions to revisit"
+                  }
+                  accent={flaggedCount ? "primary" : "success"}
                 />
               </section>
 
@@ -778,7 +947,9 @@ const Index = () => {
                         <div className="flex flex-wrap items-center gap-4">
                           <div>
                             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground/80">
-                              {settings.mode === 'practice' ? 'Practice mode' : 'Test mode'}
+                              {settings.mode === "practice"
+                                ? "Practice mode"
+                                : "Test mode"}
                             </p>
                             <p className="text-2xl font-semibold text-foreground">
                               {answeredCount} / {totalQuestions} answered
@@ -787,16 +958,24 @@ const Index = () => {
                           {settings.timerEnabled && timerStarted && (
                             <div className="flex items-center gap-3 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3">
                               <TimerIcon className="h-5 w-5 text-primary" />
-                              <QuizTimer durationMinutes={settings.timerMinutes} onTimeUp={handleTimeUp} isPaused={false} />
+                              <QuizTimer
+                                durationMinutes={settings.timerMinutes}
+                                onTimeUp={handleTimeUp}
+                                isPaused={false}
+                              />
                             </div>
                           )}
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          <Button onClick={handleReset} variant="outline" size="sm">
+                          <Button
+                            onClick={handleReset}
+                            variant="outline"
+                            size="sm"
+                          >
                             <RotateCcw className="mr-2 h-4 w-4" />
                             Reset
                           </Button>
-                          {settings.mode === 'test' && (
+                          {settings.mode === "test" && (
                             <Button onClick={handleSubmit} size="sm">
                               <CheckCircle className="mr-2 h-4 w-4" />
                               Submit quiz
@@ -821,7 +1000,11 @@ const Index = () => {
                           onReset={handleReset}
                         />
                         {results.correctAnswers < results.totalQuestions && (
-                          <Button onClick={handleReviewWrong} variant="outline" className="mt-4 w-full">
+                          <Button
+                            onClick={handleReviewWrong}
+                            variant="outline"
+                            className="mt-4 w-full"
+                          >
                             <Eye className="mr-2 h-4 w-4" />
                             Review incorrect answers
                           </Button>
@@ -840,8 +1023,9 @@ const Index = () => {
                           className="rounded-2xl border border-destructive/30 bg-destructive/10 p-4"
                         >
                           <p className="text-sm font-semibold text-destructive-foreground">
-                            Reviewing {filteredQuestions.length} incorrect answer
-                            {filteredQuestions.length !== 1 ? 's' : ''}.
+                            Reviewing {filteredQuestions.length} incorrect
+                            answer
+                            {filteredQuestions.length !== 1 ? "s" : ""}.
                           </p>
                         </motion.div>
                       )}
@@ -854,11 +1038,13 @@ const Index = () => {
                           onAnswer={handleAnswer}
                           onFlag={handleFlag}
                           isGraded={isGraded}
-                          isPracticeMode={settings.mode === 'practice'}
+                          isPracticeMode={settings.mode === "practice"}
                           showFeedback={!!question.userAnswer}
                           isCorrect={
                             isGraded
-                              ? results?.answers.find((answer) => answer.questionId === question.id)?.isCorrect
+                              ? results?.answers.find(
+                                  (answer) => answer.questionId === question.id
+                                )?.isCorrect
                               : undefined
                           }
                         />
@@ -874,28 +1060,35 @@ const Index = () => {
                 >
                   <div className="sticky top-24 space-y-6">
                     <div className="glass-panel p-6">
-                      <h3 className="text-lg font-semibold text-foreground">Progress</h3>
+                      <h3 className="text-lg font-semibold text-foreground">
+                        Progress
+                      </h3>
                       <p className="text-sm text-muted-foreground">
-                        Jump to any question or see which ones still need attention.
+                        Jump to any question or see which ones still need
+                        attention.
                       </p>
                       <div className="mt-4">
                         <QuizProgress questions={quizData.questions} />
                       </div>
                     </div>
 
-                    {typeof accuracyPercent === 'number' && (
+                    {typeof accuracyPercent === "number" && (
                       <div className="rounded-3xl border border-success/20 bg-success/10 p-5 shadow-lg backdrop-blur">
                         <div className="flex items-center gap-3">
                           <CheckCircle className="h-5 w-5 text-success" />
                           <div>
-                            <p className="text-sm font-semibold text-success">Accuracy so far</p>
-                            <p className="text-xl font-semibold text-success">{accuracyPercent}%</p>
+                            <p className="text-sm font-semibold text-success">
+                              Accuracy so far
+                            </p>
+                            <p className="text-xl font-semibold text-success">
+                              {accuracyPercent}%
+                            </p>
                           </div>
                         </div>
                         <p className="mt-3 text-sm text-success/80">
                           {isGraded
-                            ? 'Final score based on submitted answers.'
-                            : 'Practice feedback updates as you answer.'}
+                            ? "Final score based on submitted answers."
+                            : "Practice feedback updates as you answer."}
                         </p>
                       </div>
                     )}
@@ -908,7 +1101,8 @@ const Index = () => {
 
         <footer className="border-t border-border/70 bg-background/80 py-8 backdrop-blur">
           <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-            Quiz Runner - Built with React, TypeScript, and Framer Motion - You are ready to ship quizzes to learners.
+            Quiz Runner - Built with React, TypeScript, and Framer Motion - You
+            are ready to ship quizzes to learners.
           </div>
         </footer>
       </div>
