@@ -121,29 +121,6 @@ const ctaContainerVariants = {
   },
 };
 
-const QUICK_START_STEPS: Array<{ icon: LucideIcon; title: string; description: string }> = [
-  {
-    icon: ClipboardList,
-    title: 'Drop your quiz text',
-    description: 'Paste questions directly or load the demo quiz to see the ideal formatting.',
-  },
-  {
-    icon: PlayCircle,
-    title: 'Parse & preview',
-    description: 'Tap Parse to convert the text into interactive cards—your draft autosaves in the browser.',
-  },
-  {
-    icon: Settings2,
-    title: 'Choose a mode',
-    description: 'Open Settings to switch between practice or test mode and optionally enable a countdown timer.',
-  },
-  {
-    icon: Trophy,
-    title: 'Answer & review',
-    description: 'Work through the cards, flag tricky questions, then submit to grade and review the misses.',
-  },
-];
-
 const ctaButtonVariants = {
   hidden: { opacity: 0, y: 20, scale: 0.95 },
   visible: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 260, damping: 18 } },
@@ -196,17 +173,6 @@ const Index = () => {
   const [parseState, setParseState] = useState<ParseState>('idle');
   const parseStateTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const parseTransitionTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [isSoundEnabled, setIsSoundEnabled] = useState(true);
-  const {
-    playPrimary,
-    playSuccess,
-    playError,
-    playSelect,
-    playAnswerCorrect,
-    playAnswerIncorrect,
-    playFlag,
-    playAchievement,
-  } = useInterfaceSounds({ muted: !isSoundEnabled });
 
   const updateParseState = useCallback((state: ParseState) => {
     setParseState(state);
@@ -257,10 +223,6 @@ const Index = () => {
   }, [settings]);
 
   useEffect(() => {
-    localStorage.setItem(SOUND_PREF_KEY, String(isSoundEnabled));
-  }, [isSoundEnabled]);
-
-  useEffect(() => {
     return () => {
       if (parseStateTimeout.current) {
         clearTimeout(parseStateTimeout.current);
@@ -272,22 +234,11 @@ const Index = () => {
   }, []);
 
   const handleParse = useCallback(() => {
-    if (!quizText.trim()) {
-      playError();
-      toast({
-        title: 'Nothing to parse yet',
-        description: 'Paste a quiz first or load the sample data to see how it works.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     if (parseTransitionTimeout.current) {
       clearTimeout(parseTransitionTimeout.current);
       parseTransitionTimeout.current = null;
     }
 
-    playPrimary();
     updateParseState('parsing');
 
     try {
@@ -295,7 +246,6 @@ const Index = () => {
 
       if (parsed.questions.length === 0) {
         updateParseState('error');
-        playError();
         toast({
           title: 'No questions found',
           description: 'Please check your quiz format and try again.',
@@ -305,7 +255,6 @@ const Index = () => {
       }
 
       updateParseState('success');
-      playSuccess();
       parseTransitionTimeout.current = setTimeout(() => {
         setQuizData(parsed);
         setIsGraded(false);
@@ -321,14 +270,13 @@ const Index = () => {
       });
     } catch (error) {
       updateParseState('error');
-      playError();
       toast({
         title: 'Parse error',
         description: 'Failed to understand the quiz text. Double-check the format.',
         variant: 'destructive',
       });
     }
-  }, [playError, playPrimary, playSuccess, quizText, settings.timerEnabled, updateParseState]);
+  }, [quizText, settings.timerEnabled, updateParseState]);
 
   const evaluateAnswer = useCallback((question: Question, answer: string | string[]): boolean => {
     if (question.type === 'match' && Array.isArray(question.correctAnswer) && Array.isArray(answer)) {
@@ -505,7 +453,7 @@ const Index = () => {
       title: 'Workspace cleared',
       description: 'Start fresh or load the sample quiz to explore features faster.',
     });
-  }, [playPrimary, updateParseState]);
+  }, [updateParseState]);
 
   const handleReviewWrong = useCallback(() => {
     playSelect();
@@ -529,7 +477,7 @@ const Index = () => {
       title: 'Sample quiz loaded',
       description: 'Hit "Parse Quiz" to try the workflow with curated questions.',
     });
-  }, [playPrimary, updateParseState]);
+  }, [updateParseState]);
 
   const filteredQuestions = useMemo<Question[]>(() => {
     if (!quizData) {
