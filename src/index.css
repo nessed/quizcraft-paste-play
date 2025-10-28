@@ -140,3 +140,17 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+@layer components {
+  .glass-panel {
+    @apply rounded-3xl border border-border/60 bg-card/90 shadow-xl backdrop-blur;
+  }
+
+  .glass-panel-muted {
+    @apply rounded-3xl border border-border/50 bg-card/80 shadow-lg backdrop-blur-sm;
+  }
+
+  .pill-badge {
+    @apply inline-flex items-center gap-2 rounded-full border border-border/50 bg-background/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground shadow-sm backdrop-blur-sm;
+  }
+}

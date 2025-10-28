@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -99,6 +99,31 @@ type QuickStatCardProps = {
   accent?: 'primary' | 'success' | 'warning';
 };
 
+type ParseState = 'idle' | 'parsing' | 'success' | 'error';
+
+const ctaContainerVariants = {
+  hidden: { opacity: 0, y: 16 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.5, staggerChildren: 0.08, delayChildren: 0.2 },
+  },
+};
+
+const ctaButtonVariants = {
+  hidden: { opacity: 0, y: 20, scale: 0.95 },
+  visible: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 260, damping: 18 } },
+};
+
+const featureCardVariants = {
+  hidden: { opacity: 0, x: 16 },
+  visible: (index = 0) => ({
+    opacity: 1,
+    x: 0,
+    transition: { delay: 0.15 + index * 0.08, duration: 0.4, ease: 'easeOut' },
+  }),
+};
+
 const accentIconClasses: Record<NonNullable<QuickStatCardProps['accent']>, string> = {
   primary: 'bg-primary/10 text-primary dark:bg-primary/15',
   success: 'bg-success/10 text-success dark:bg-success/20',
@@ -134,6 +159,25 @@ const Index = () => {
   const [settings, setSettings] = useState<QuizSettingsType>(DEFAULT_SETTINGS);
   const [reviewMode, setReviewMode] = useState(false);
   const [timerStarted, setTimerStarted] = useState(false);
+  const [parseState, setParseState] = useState<ParseState>('idle');
+  const parseStateTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const parseTransitionTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const updateParseState = useCallback((state: ParseState) => {
+    setParseState(state);
+
+    if (parseStateTimeout.current) {
+      clearTimeout(parseStateTimeout.current);
+      parseStateTimeout.current = null;
+    }
+
+    if (state === 'success' || state === 'error') {
+      parseStateTimeout.current = setTimeout(() => {
+        setParseState('idle');
+        parseStateTimeout.current = null;
+      }, 2200);
+    }
+  }, []);
 
   useEffect(() => {
     const savedText = localStorage.getItem(STORAGE_KEY);
@@ -161,10 +205,30 @@ const Index = () => {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   }, [settings]);
 
+  useEffect(() => {
+    return () => {
+      if (parseStateTimeout.current) {
+        clearTimeout(parseStateTimeout.current);
+      }
+      if (parseTransitionTimeout.current) {
+        clearTimeout(parseTransitionTimeout.current);
+      }
+    };
+  }, []);
+
   const handleParse = useCallback(() => {
+    if (parseTransitionTimeout.current) {
+      clearTimeout(parseTransitionTimeout.current);
+      parseTransitionTimeout.current = null;
+    }
+
+    updateParseState('parsing');
+
     try {
       const parsed = parseQuizText(quizText);
+
       if (parsed.questions.length === 0) {
+        updateParseState('error');
         toast({
           title: 'No questions found',
           description: 'Please check your quiz format and try again.',
@@ -172,23 +236,30 @@ const Index = () => {
         });
         return;
       }
-      setQuizData(parsed);
-      setIsGraded(false);
-      setResults(null);
-      setReviewMode(false);
-      setTimerStarted(settings.timerEnabled);
+
+      updateParseState('success');
+      parseTransitionTimeout.current = setTimeout(() => {
+        setQuizData(parsed);
+        setIsGraded(false);
+        setResults(null);
+        setReviewMode(false);
+        setTimerStarted(settings.timerEnabled);
+        parseTransitionTimeout.current = null;
+      }, 320);
+
       toast({
         title: 'Quiz ready!',
         description: `Loaded ${parsed.questions.length} question${parsed.questions.length > 1 ? 's' : ''}.`,
       });
     } catch (error) {
+      updateParseState('error');
       toast({
         title: 'Parse error',
         description: 'Failed to understand the quiz text. Double-check the format.',
         variant: 'destructive',
       });
     }
-  }, [quizText, settings.timerEnabled]);
+  }, [quizText, settings.timerEnabled, updateParseState]);
 
   const evaluateAnswer = useCallback((question: Question, answer: string | string[]): boolean => {
     if (question.type === 'match' && Array.isArray(question.correctAnswer) && Array.isArray(answer)) {
@@ -296,6 +367,11 @@ const Index = () => {
   }, [quizData]);
 
   const handleReset = useCallback(() => {
+    if (parseTransitionTimeout.current) {
+      clearTimeout(parseTransitionTimeout.current);
+      parseTransitionTimeout.current = null;
+    }
+    updateParseState('idle');
     setQuizText('');
     setQuizData(null);
     setIsGraded(false);
@@ -307,13 +383,18 @@ const Index = () => {
       title: 'Workspace cleared',
       description: 'Start fresh or load the sample quiz to explore features faster.',
     });
-  }, []);
+  }, [updateParseState]);
 
   const handleReviewWrong = useCallback(() => {
     setReviewMode(true);
   }, []);
 
   const handleLoadSample = useCallback(() => {
+    if (parseTransitionTimeout.current) {
+      clearTimeout(parseTransitionTimeout.current);
+      parseTransitionTimeout.current = null;
+    }
+    updateParseState('idle');
     setQuizText(SAMPLE_QUIZ);
     setQuizData(null);
     setIsGraded(false);
@@ -324,7 +405,7 @@ const Index = () => {
       title: 'Sample quiz loaded',
       description: 'Hit "Parse Quiz" to try the workflow with curated questions.',
     });
-  }, []);
+  }, [updateParseState]);
 
   const filteredQuestions = useMemo<Question[]>(() => {
     if (!quizData) {
@@ -427,38 +508,65 @@ const Index = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
-                className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/90 p-8 shadow-2xl backdrop-blur"
+                className="relative overflow-hidden glass-panel p-8 sm:p-10"
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/15 via-transparent to-transparent" />
-                <div className="relative grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
-                  <div className="space-y-6">
-                    <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
-                      <Sparkles className="h-4 w-4" />
+                <div className="pointer-events-none absolute -top-32 right-12 h-64 w-64 rounded-full bg-primary/15 blur-3xl" />
+                <div className="pointer-events-none absolute -bottom-24 left-12 h-56 w-56 rounded-full bg-primary/10 blur-3xl" />
+                <div className="relative grid gap-10 xl:grid-cols-[minmax(0,1fr)_320px]">
+                  <div className="space-y-8">
+                    <motion.div
+                      className="pill-badge !border-primary/30 !bg-primary/10 !text-primary"
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.15, duration: 0.4 }}
+                    >
+                      <Sparkles className="h-3.5 w-3.5" />
                       Smart quiz parsing
-                    </div>
-                    <h1 className="text-3xl font-bold leading-tight text-foreground sm:text-4xl">
-                      Paste any quiz text and get a user-ready practice experience instantly.
+                    </motion.div>
+                    <h1 className="text-4xl font-bold leading-tight text-foreground sm:text-5xl xl:text-6xl">
+                      Paste any quiz text and get a
+                      <span className="ml-2 inline-flex bg-gradient-to-r from-primary via-primary/80 to-purple-500 bg-clip-text text-transparent">
+                        user-ready practice hub instantly.
+                      </span>
                     </h1>
                     <p className="max-w-2xl text-base text-muted-foreground sm:text-lg">
-                      Auto-saved drafts, timer support, review mode, and beautiful question cards make prepping fast and
-                      focused.
+                      Auto-saved drafts, timer support, review mode, and animated question cards keep study sessions smooth,
+                      modern, and focused on mastery.
                     </p>
-                    <div className="flex flex-wrap gap-3">
-                      <Button size="lg" onClick={handleLoadSample}>
-                        <Sparkles className="mr-2 h-4 w-4" />
-                        Explore with sample data
-                      </Button>
-                      <Button size="lg" variant="outline" onClick={handleParse} disabled={!quizText.trim()}>
-                        <CheckCircle className="mr-2 h-4 w-4" />
-                        Parse current quiz
-                      </Button>
-                    </div>
+                    <motion.div
+                      className="flex flex-wrap items-center gap-3"
+                      variants={ctaContainerVariants}
+                      initial="hidden"
+                      animate="visible"
+                    >
+                      <motion.div variants={ctaButtonVariants}>
+                        <Button size="lg" onClick={handleLoadSample}>
+                          <Sparkles className="mr-2 h-4 w-4" />
+                          Explore with sample data
+                        </Button>
+                      </motion.div>
+                      <motion.div variants={ctaButtonVariants}>
+                        <Button
+                          size="lg"
+                          variant="outline"
+                          onClick={handleParse}
+                          disabled={!quizText.trim() || parseState === 'parsing'}
+                        >
+                          <CheckCircle className="mr-2 h-4 w-4" />
+                          Parse current quiz
+                        </Button>
+                      </motion.div>
+                    </motion.div>
                   </div>
                   <div className="space-y-4">
-                    {HERO_FEATURES.map(({ icon: Icon, title, description }) => (
-                      <div
+                    {HERO_FEATURES.map(({ icon: Icon, title, description }, index) => (
+                      <motion.div
                         key={title}
-                        className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/60 px-4 py-3 backdrop-blur dark:border-white/5 dark:bg-slate-900/70"
+                        custom={index}
+                        variants={featureCardVariants}
+                        initial="hidden"
+                        animate="visible"
+                        className="glass-panel-muted flex items-start gap-3 border-border/40 px-4 py-3"
                       >
                         <div className="mt-1 flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
                           <Icon className="h-4 w-4" />
@@ -467,24 +575,27 @@ const Index = () => {
                           <p className="text-sm font-semibold text-foreground">{title}</p>
                           <p className="text-sm text-muted-foreground">{description}</p>
                         </div>
-                      </div>
+                      </motion.div>
                     ))}
                   </div>
                 </div>
               </motion.section>
 
-              <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
-                <motion.div
-                  layout
-                  className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/90 p-6 shadow-xl backdrop-blur"
-                >
-                  <QuizInput value={quizText} onChange={setQuizText} onParse={handleParse} isDisabled={false} />
+              <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
+                <motion.div layout className="relative overflow-hidden glass-panel p-6">
+                  <QuizInput
+                    value={quizText}
+                    onChange={setQuizText}
+                    onParse={handleParse}
+                    isDisabled={false}
+                    parseState={parseState}
+                  />
                 </motion.div>
 
                 <div className="space-y-6">
                   <motion.div
                     layout
-                    className="rounded-3xl border border-border/60 bg-card/90 p-6 shadow-xl backdrop-blur"
+                    className="glass-panel p-6"
                   >
                     <PromptBlock />
                   </motion.div>
@@ -546,7 +657,7 @@ const Index = () => {
                     <motion.div
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="rounded-3xl border border-border/70 bg-card/95 p-6 shadow-xl backdrop-blur"
+                      className="glass-panel p-6"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-4">
                         <div className="flex flex-wrap items-center gap-4">
@@ -647,7 +758,7 @@ const Index = () => {
                   className="space-y-6"
                 >
                   <div className="sticky top-24 space-y-6">
-                    <div className="rounded-3xl border border-border/70 bg-card/95 p-6 shadow-xl backdrop-blur">
+                    <div className="glass-panel p-6">
                       <h3 className="text-lg font-semibold text-foreground">Progress</h3>
                       <p className="text-sm text-muted-foreground">
                         Jump to any question or see which ones still need attention.
