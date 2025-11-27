@@ -1,4 +1,23 @@
-import { ParseWarning, Question, QuizData } from '@/types/quiz';
+import { ParseWarning, Question, QuizData, QuestionType } from '@/types/quiz';
+
+type DraftQuestion = Partial<Question> & {
+  hasBlankMarkers?: boolean;
+  declaredType?: QuestionType | null;
+};
+
+function detectQuestionType(text: string): QuestionType | null {
+  const match = text.match(/type\s*[:\-]\s*([a-zA-Z/\s-]+)/i);
+
+  if (!match) return null;
+
+  const raw = match[1].toLowerCase();
+  if (raw.includes('mcq') || raw.includes('multiple')) return 'mcq';
+  if (raw.includes('true')) return 'truefalse';
+  if (raw.includes('fill')) return 'fillin';
+  if (raw.includes('match')) return 'match';
+
+  return null;
+}
 
 export function parseQuizText(text: string): QuizData {
   const lines = text.split('\n').map(line => line.trim());
@@ -39,7 +58,7 @@ export function parseQuizText(text: string): QuizData {
     lines.splice(answerKeyLineIndex, 1);
   }
   
-  let currentQuestion: Partial<Question> | null = null;
+  let currentQuestion: DraftQuestion | null = null;
   let questionNumber = 0;
   let totalQuestions = 0;
   
@@ -81,6 +100,20 @@ export function parseQuizText(text: string): QuizData {
       }
     }
 
+    const hasMCQOptions = currentQuestion.options && currentQuestion.options.length >= 2;
+
+    if (currentQuestion.hasBlankMarkers && hasMCQOptions) {
+      if (currentQuestion.type !== 'mcq') {
+        currentQuestion.type = 'mcq';
+      }
+
+      warn(
+        'blank_markers_coerced_to_mcq',
+        'Question prompt contained blanks but MCQ options were supplied, so it was treated as multiple-choice.',
+        currentQuestion.question
+      );
+    }
+
     if (!currentQuestion.correctAnswer || (Array.isArray(currentQuestion.correctAnswer) && currentQuestion.correctAnswer.length === 0)) {
       warn('missing_answer', 'A question was skipped because no answer was provided.', currentQuestion.question);
       return;
@@ -92,7 +125,9 @@ export function parseQuizText(text: string): QuizData {
     }
 
     seenQuestionNumbers.add(questionNumber);
-    parsedQuestions.push(currentQuestion as Question);
+
+    const { hasBlankMarkers: _hasBlankMarkers, declaredType: _declaredType, ...safeQuestion } = currentQuestion;
+    parsedQuestions.push(safeQuestion as Question);
   };
 
   for (let i = 0; i < lines.length; i++) {
@@ -106,38 +141,48 @@ export function parseQuizText(text: string): QuizData {
       finalizeQuestion();
 
       const match = line.match(/^Question\s+(\d+)\s+of\s+\d+/i);
+      const headerType = detectQuestionType(line);
       questionNumber = match ? parseInt(match[1]) : questionNumber + 1;
 
       // Next line should be the actual question
       i++;
       if (i < lines.length) {
         const questionText = lines[i].trim();
+        const inlineType = detectQuestionType(questionText);
+        const cleanedQuestion = questionText.replace(/^\s*\[?type\s*[:\-]\s*[a-zA-Z/\s-]+\]?\s*/i, '').trim();
+        const lowerCaseQuestion = cleanedQuestion.toLowerCase();
+        const hasBlankMarkers = /_{3,}/.test(cleanedQuestion);
+        const hasFillKeyword = lowerCaseQuestion.includes('fill in the blank');
+        const hasTrueFalse = lowerCaseQuestion.includes('true or false') || lowerCaseQuestion.includes('(t/f)');
+        const hasMatch = lowerCaseQuestion.includes('match the following');
 
-        if (!questionText) {
+        if (!cleanedQuestion) {
           warn('missing_question_text', 'A question header was found without a prompt.', `Question ${questionNumber}`);
           currentQuestion = null;
           continue;
         }
 
+        let resolvedType: QuestionType = headerType ?? inlineType ?? 'mcq';
+
+        if (!headerType && !inlineType) {
+          if (hasMatch) {
+            resolvedType = 'match';
+          } else if (hasTrueFalse) {
+            resolvedType = 'truefalse';
+          } else if (hasFillKeyword || hasBlankMarkers) {
+            resolvedType = 'fillin';
+          }
+        }
+
         currentQuestion = {
           id: `q${questionNumber}`,
-          question: questionText,
-          type: 'mcq', // Default
+          question: cleanedQuestion,
+          type: resolvedType,
           options: [],
           correctAnswer: '',
+          hasBlankMarkers,
+          declaredType: headerType ?? inlineType,
         };
-
-        // Detect question type
-        if (questionText.toLowerCase().includes('true or false') ||
-            questionText.toLowerCase().includes('(t/f)')) {
-          currentQuestion.type = 'truefalse';
-        } else if (questionText.toLowerCase().includes('fill in the blank') ||
-                   questionText.includes('_____') ||
-                   questionText.includes('___')) {
-          currentQuestion.type = 'fillin';
-        } else if (questionText.toLowerCase().includes('match the following')) {
-          currentQuestion.type = 'match';
-        }
       } else {
         warn('missing_question_text', 'A question header was found without a prompt.', `Question ${questionNumber}`);
       }
@@ -145,12 +190,16 @@ export function parseQuizText(text: string): QuizData {
     // Check for MCQ options such as "A. option", "A) option", or "A: option"
     else if (currentQuestion && /^[A-D][\.\):]\s+(.+)/i.test(line)) {
       const optionMatch = line.match(/^([A-D])[\.\):]\s+(.+)/i);
-      if (optionMatch && currentQuestion.type === 'mcq') {
+      if (optionMatch && currentQuestion.type !== 'match') {
         currentQuestion.options = currentQuestion.options || [];
         currentQuestion.options.push({
           label: optionMatch[1].toUpperCase(),
           text: optionMatch[2].trim(),
         });
+
+        if (currentQuestion.type !== 'mcq') {
+          currentQuestion.type = 'mcq';
+        }
       }
     }
     // Check for per-question answer
@@ -160,6 +209,12 @@ export function parseQuizText(text: string): QuizData {
       if (!answerText) {
         warn('missing_answer', 'An answer label was present but empty.', currentQuestion.question);
         continue;
+      }
+
+      const lowerAnswer = answerText.toLowerCase();
+
+      if (!currentQuestion.options?.length && (lowerAnswer === 'true' || lowerAnswer === 'false')) {
+        currentQuestion.type = 'truefalse';
       }
 
       if (currentQuestion.type === 'match') {

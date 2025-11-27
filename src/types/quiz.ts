@@ -28,7 +28,8 @@ export interface ParseWarning {
     | 'count_mismatch'
     | 'orphan_answer'
     | 'orphan_option'
-    | 'invalid_answer_key_pair';
+    | 'invalid_answer_key_pair'
+    | 'blank_markers_coerced_to_mcq';
   message: string;
   details?: string;
 }
