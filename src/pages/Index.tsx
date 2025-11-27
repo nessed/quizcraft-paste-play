@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import type { LucideIcon } from "lucide-react";
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import type { LucideIcon } from 'lucide-react';
 import {
   BookOpen,
   CheckCircle,
@@ -19,29 +19,26 @@ import {
   Volume2,
   VolumeX,
   Info,
-} from "lucide-react";
-import { QuizInput } from "@/components/QuizInput";
-import { QuestionCard } from "@/components/QuestionCard";
-import { ResultsPanel } from "@/components/ResultsPanel";
-import { PromptBlock } from "@/components/PromptBlock";
-import { QuizSettings } from "@/components/QuizSettings";
-import { QuizTimer } from "@/components/QuizTimer";
-import { QuizProgress } from "@/components/QuizProgress";
-import { parseQuizText, gradeQuiz } from "@/utils/quizParser";
-import {
-  Question,
-  QuizData,
-  QuizSettings as QuizSettingsType,
-} from "@/types/quiz";
-import { Button } from "@/components/ui/button";
-import { toast } from "@/hooks/use-toast";
-import { useInterfaceSounds } from "@/hooks/use-interface-sounds";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
+} from 'lucide-react';
+import { QuizInput } from '@/components/QuizInput';
+import { QuestionCard } from '@/components/QuestionCard';
+import { ResultsPanel } from '@/components/ResultsPanel';
+import { PromptBlock } from '@/components/PromptBlock';
+import { QuizSettings } from '@/components/QuizSettings';
+import { QuizTimer } from '@/components/QuizTimer';
+import { QuizProgress } from '@/components/QuizProgress';
+import { parseQuizText, gradeQuiz } from '@/utils/quizParser';
+import { ParseWarning, Question, QuizData, QuizSettings as QuizSettingsType } from '@/types/quiz';
+import { Button } from '@/components/ui/button';
+import { toast } from '@/hooks/use-toast';
+import { useInterfaceSounds } from '@/hooks/use-interface-sounds';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-const STORAGE_KEY = "quiz-runner-text";
-const SETTINGS_KEY = "quiz-runner-settings";
-const SOUND_PREF_KEY = "quiz-runner-sound-enabled";
+const STORAGE_KEY = 'quiz-runner-text';
+const SETTINGS_KEY = 'quiz-runner-settings';
+const SOUND_PREF_KEY = 'quiz-runner-sound-enabled';
 
 const DEFAULT_SETTINGS: QuizSettingsType = {
   mode: "test",
@@ -173,13 +170,58 @@ const ctaButtonVariants = {
   },
 };
 
+type ParseState = 'idle' | 'parsing' | 'success' | 'error';
+
+const ctaContainerVariants = {
+  hidden: { opacity: 0, y: 16 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.5, staggerChildren: 0.08, delayChildren: 0.2 },
+  },
+};
+
+const QUICK_START_STEPS: Array<{ icon: LucideIcon; title: string; description: string }> = [
+  {
+    icon: ClipboardList,
+    title: 'Drop your quiz text',
+    description: 'Paste questions directly or load the demo quiz to see the ideal formatting.',
+  },
+  {
+    icon: PlayCircle,
+    title: 'Parse & preview',
+    description: 'Tap Parse to convert the text into interactive cards—your draft autosaves in the browser.',
+  },
+  {
+    icon: Settings2,
+    title: 'Choose a mode',
+    description: 'Open Settings to switch between practice or test mode and optionally enable a countdown timer.',
+  },
+  {
+    icon: Trophy,
+    title: 'Answer & review',
+    description: 'Work through the cards, flag tricky questions, then submit to grade and review the misses.',
+  },
+];
+
+const ctaButtonVariants = {
+  hidden: { opacity: 0, y: 20, scale: 0.95 },
+  visible: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 260, damping: 18 } },
+};
+
 const featureCardVariants = {
   hidden: { opacity: 0, x: 16 },
   visible: (index = 0) => ({
     opacity: 1,
     x: 0,
-    transition: { delay: 0.15 + index * 0.08, duration: 0.4, ease: "easeOut" },
+    transition: { delay: 0.15 + index * 0.08, duration: 0.4, ease: 'easeOut' },
   }),
+};
+
+const accentIconClasses: Record<NonNullable<QuickStatCardProps['accent']>, string> = {
+  primary: 'bg-primary/10 text-primary dark:bg-primary/15',
+  success: 'bg-success/10 text-success dark:bg-success/20',
+  warning: 'bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-200',
 };
 
 const accentIconClasses: Record<
@@ -225,6 +267,30 @@ const QuickStatCard = ({
   </motion.div>
 );
 
+const ParseWarningsPanel = ({ warnings }: { warnings: ParseWarning[] }) => {
+  if (!warnings.length) return null;
+
+  return (
+    <Alert className="border-amber-300/70 bg-amber-50/70 shadow-sm backdrop-blur-sm dark:border-amber-500/50 dark:bg-amber-500/10">
+      <AlertTitle className="flex items-center gap-2 text-amber-950 dark:text-amber-50">
+        <Info className="h-4 w-4" aria-hidden="true" />
+        Formatting issues we noticed
+      </AlertTitle>
+      <AlertDescription className="text-amber-900/80 dark:text-amber-50/80">
+        <p className="text-sm">We loaded the quiz but some lines need attention:</p>
+        <ul className="mt-2 list-disc space-y-1 pl-5">
+          {warnings.map((warning, index) => (
+            <li key={`${warning.code}-${index}`} className="text-sm leading-relaxed">
+              <span className="font-medium text-foreground">{warning.message}</span>
+              {warning.details ? <span className="text-muted-foreground"> — {warning.details}</span> : null}
+            </li>
+          ))}
+        </ul>
+      </AlertDescription>
+    </Alert>
+  );
+};
+
 const Index = () => {
   const [quizText, setQuizText] = useState("");
   const [quizData, setQuizData] = useState<QuizData | null>(null);
@@ -235,13 +301,11 @@ const Index = () => {
   const [settings, setSettings] = useState<QuizSettingsType>(DEFAULT_SETTINGS);
   const [reviewMode, setReviewMode] = useState(false);
   const [timerStarted, setTimerStarted] = useState(false);
-  const [parseState, setParseState] = useState<ParseState>("idle");
-  const [isSoundEnabled, setIsSoundEnabled] = useState(true);
+  const [parseState, setParseState] = useState<ParseState>('idle');
+  const [parseWarnings, setParseWarnings] = useState<ParseWarning[]>([]);
   const parseStateTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const parseTransitionTimeout = useRef<ReturnType<typeof setTimeout> | null>(
-    null
-  );
-
+  const parseTransitionTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isSoundEnabled, setIsSoundEnabled] = useState(true);
   const {
     playPrimary,
     playSuccess,
@@ -261,9 +325,9 @@ const Index = () => {
       parseStateTimeout.current = null;
     }
 
-    if (state === "success" || state === "error") {
+    if (state === 'success' || state === 'error') {
       parseStateTimeout.current = setTimeout(() => {
-        setParseState("idle");
+        setParseState('idle');
         parseStateTimeout.current = null;
       }, 2200);
     }
@@ -285,7 +349,7 @@ const Index = () => {
       }
     }
     if (savedSoundPref) {
-      setIsSoundEnabled(savedSoundPref !== "false");
+      setIsSoundEnabled(savedSoundPref !== 'false');
     }
   }, []);
 
@@ -302,6 +366,10 @@ const Index = () => {
   }, [settings]);
 
   useEffect(() => {
+    localStorage.setItem(SOUND_PREF_KEY, String(isSoundEnabled));
+  }, [isSoundEnabled]);
+
+  useEffect(() => {
     return () => {
       if (parseStateTimeout.current) {
         clearTimeout(parseStateTimeout.current);
@@ -313,18 +381,33 @@ const Index = () => {
   }, []);
 
   const handleParse = useCallback(() => {
+    if (!quizText.trim()) {
+      setParseWarnings([]);
+      playError();
+      toast({
+        title: 'Nothing to parse yet',
+        description: 'Paste a quiz first or load the sample data to see how it works.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (parseTransitionTimeout.current) {
       clearTimeout(parseTransitionTimeout.current);
       parseTransitionTimeout.current = null;
     }
 
-    updateParseState("parsing");
+    playPrimary();
+    updateParseState('parsing');
+    setParseWarnings([]);
 
     try {
       const parsed = parseQuizText(quizText);
+      setParseWarnings(parsed.warnings ?? []);
 
       if (parsed.questions.length === 0) {
-        updateParseState("error");
+        updateParseState('error');
+        playError();
         toast({
           title: "No questions found",
           description: "Please check your quiz format and try again.",
@@ -333,7 +416,8 @@ const Index = () => {
         return;
       }
 
-      updateParseState("success");
+      updateParseState('success');
+      playSuccess();
       parseTransitionTimeout.current = setTimeout(() => {
         setQuizData(parsed);
         setIsGraded(false);
@@ -350,15 +434,17 @@ const Index = () => {
         }.`,
       });
     } catch (error) {
-      updateParseState("error");
+      updateParseState('error');
+      playError();
       toast({
         title: "Parse error",
         description:
           "Failed to understand the quiz text. Double-check the format.",
         variant: "destructive",
       });
+      setParseWarnings([]);
     }
-  }, [quizText, settings.timerEnabled, updateParseState]);
+  }, [playError, playPrimary, playSuccess, quizText, settings.timerEnabled, updateParseState]);
 
   const evaluateAnswer = useCallback(
     (question: Question, answer: string | string[]): boolean => {
@@ -395,9 +481,8 @@ const Index = () => {
 
   const handleAnswer = useCallback(
     (questionId: string, answer: string | string[]) => {
-      const isPracticeMode = settings.mode === "practice";
-      let interactionOutcome: "none" | "correct" | "incorrect" | "select" =
-        "none";
+      const isPracticeMode = settings.mode === 'practice';
+      let interactionOutcome: 'none' | 'correct' | 'incorrect' | 'select' = 'none';
 
       setQuizData((previous) => {
         if (!previous) {
@@ -412,14 +497,12 @@ const Index = () => {
           }
 
           didUpdate = true;
-          const evaluation = isPracticeMode
-            ? evaluateAnswer(question, answer)
-            : undefined;
+          const evaluation = isPracticeMode ? evaluateAnswer(question, answer) : undefined;
 
           if (isPracticeMode) {
-            interactionOutcome = evaluation ? "correct" : "incorrect";
+            interactionOutcome = evaluation ? 'correct' : 'incorrect';
           } else {
-            interactionOutcome = "select";
+            interactionOutcome = 'select';
           }
 
           return {
@@ -430,7 +513,7 @@ const Index = () => {
         });
 
         if (!didUpdate) {
-          interactionOutcome = "none";
+          interactionOutcome = 'none';
           return previous;
         }
 
@@ -440,21 +523,15 @@ const Index = () => {
         };
       });
 
-      if (interactionOutcome === "correct") {
+      if (interactionOutcome === 'correct') {
         playAnswerCorrect();
-      } else if (interactionOutcome === "incorrect") {
+      } else if (interactionOutcome === 'incorrect') {
         playAnswerIncorrect();
-      } else if (interactionOutcome === "select") {
+      } else if (interactionOutcome === 'select') {
         playSelect();
       }
     },
-    [
-      evaluateAnswer,
-      playAnswerCorrect,
-      playAnswerIncorrect,
-      playSelect,
-      settings.mode,
-    ]
+    [evaluateAnswer, playAnswerCorrect, playAnswerIncorrect, playSelect, settings.mode],
   );
 
   const handleFlag = useCallback(
@@ -490,7 +567,7 @@ const Index = () => {
         playFlag(nextIsFlagged);
       }
     },
-    [playFlag]
+    [playFlag],
   );
 
   const handleSubmit = useCallback(() => {
@@ -548,13 +625,14 @@ const Index = () => {
       clearTimeout(parseTransitionTimeout.current);
       parseTransitionTimeout.current = null;
     }
-    updateParseState("idle");
-    setQuizText("");
+    updateParseState('idle');
+    setQuizText('');
     setQuizData(null);
     setIsGraded(false);
     setResults(null);
     setReviewMode(false);
     setTimerStarted(false);
+    setParseWarnings([]);
     localStorage.removeItem(STORAGE_KEY);
     playPrimary();
     toast({
@@ -562,7 +640,7 @@ const Index = () => {
       description:
         "Start fresh or load the sample quiz to explore features faster.",
     });
-  }, [updateParseState, playPrimary]);
+  }, [playPrimary, updateParseState]);
 
   const handleReviewWrong = useCallback(() => {
     playSelect();
@@ -574,7 +652,7 @@ const Index = () => {
       clearTimeout(parseTransitionTimeout.current);
       parseTransitionTimeout.current = null;
     }
-    updateParseState("idle");
+    updateParseState('idle');
     setQuizText(SAMPLE_QUIZ);
     setQuizData(null);
     setIsGraded(false);
@@ -587,7 +665,7 @@ const Index = () => {
       description:
         'Hit "Parse Quiz" to try the workflow with curated questions.',
     });
-  }, [updateParseState, playPrimary]);
+  }, [playPrimary, updateParseState]);
 
   const filteredQuestions = useMemo<Question[]>(() => {
     if (!quizData) {
@@ -687,14 +765,8 @@ const Index = () => {
 
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1.5 shadow-sm backdrop-blur">
-                <SoundIcon
-                  className="h-4 w-4 text-primary"
-                  aria-hidden="true"
-                />
-                <Label
-                  htmlFor="sound-toggle"
-                  className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground"
-                >
+                <SoundIcon className="h-4 w-4 text-primary" aria-hidden="true" />
+                <Label htmlFor="sound-toggle" className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   Sound
                 </Label>
                 <Switch
@@ -751,8 +823,7 @@ const Index = () => {
                       </span>
                     </h1>
                     <p className="max-w-2xl text-base text-muted-foreground sm:text-lg">
-                      Auto-saved drafts, timer support, review mode, and
-                      animated question cards keep study sessions smooth,
+                      Auto-saved drafts, timer support, review mode, and animated question cards keep study sessions smooth,
                       modern, and focused on mastery.
                     </p>
                     <motion.div
@@ -772,9 +843,7 @@ const Index = () => {
                           size="lg"
                           variant="outline"
                           onClick={handleParse}
-                          disabled={
-                            !quizText.trim() || parseState === "parsing"
-                          }
+                          disabled={!quizText.trim() || parseState === 'parsing'}
                         >
                           <CheckCircle className="mr-2 h-4 w-4" />
                           Parse current quiz
@@ -783,39 +852,30 @@ const Index = () => {
                     </motion.div>
                   </div>
                   <div className="space-y-4">
-                    {HERO_FEATURES.map(
-                      ({ icon: Icon, title, description }, index) => (
-                        <motion.div
-                          key={title}
-                          custom={index}
-                          variants={featureCardVariants}
-                          initial="hidden"
-                          animate="visible"
-                          className="glass-panel-muted flex items-start gap-3 border-border/40 px-4 py-3"
-                        >
-                          <div className="mt-1 flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
-                            <Icon className="h-4 w-4" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-semibold text-foreground">
-                              {title}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              {description}
-                            </p>
-                          </div>
-                        </motion.div>
-                      )
-                    )}
+                    {HERO_FEATURES.map(({ icon: Icon, title, description }, index) => (
+                      <motion.div
+                        key={title}
+                        custom={index}
+                        variants={featureCardVariants}
+                        initial="hidden"
+                        animate="visible"
+                        className="glass-panel-muted flex items-start gap-3 border-border/40 px-4 py-3"
+                      >
+                        <div className="mt-1 flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
+                          <Icon className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">{title}</p>
+                          <p className="text-sm text-muted-foreground">{description}</p>
+                        </div>
+                      </motion.div>
+                    ))}
                   </div>
                 </div>
               </motion.section>
 
               <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
-                <motion.div
-                  layout
-                  className="relative overflow-hidden glass-panel p-6"
-                >
+                <motion.div layout className="relative overflow-hidden glass-panel p-6">
                   <QuizInput
                     value={quizText}
                     onChange={setQuizText}
@@ -823,10 +883,16 @@ const Index = () => {
                     isDisabled={false}
                     parseState={parseState}
                   />
+                  <div className="mt-4">
+                    <ParseWarningsPanel warnings={parseWarnings} />
+                  </div>
                 </motion.div>
 
                 <div className="space-y-6">
-                  <motion.div layout className="glass-panel p-6">
+                  <motion.div
+                    layout
+                    className="glass-panel p-6"
+                  >
                     <PromptBlock />
                   </motion.div>
 
@@ -854,37 +920,33 @@ const Index = () => {
                     </div>
                   </motion.div>
 
-                  <motion.div layout className="glass-panel p-6">
+                  <motion.div
+                    layout
+                    className="glass-panel p-6"
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <h3 className="text-lg font-semibold text-foreground">
-                          How it works
-                        </h3>
+                        <h3 className="text-lg font-semibold text-foreground">How it works</h3>
                         <p className="text-sm text-muted-foreground">
-                          Four quick steps keep everyone aligned before you
-                          share the link.
+                          Four quick steps keep everyone aligned before you share the link.
                         </p>
                       </div>
                       <Info className="h-5 w-5 text-primary" />
                     </div>
                     <ol className="mt-5 space-y-4">
-                      {QUICK_START_STEPS.map(
-                        ({ icon: Icon, title, description }, index) => (
-                          <li key={title} className="flex items-start gap-3">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                              <Icon className="h-4 w-4" aria-hidden="true" />
-                            </div>
-                            <div>
-                              <p className="text-sm font-semibold text-foreground">
-                                Step {index + 1}: {title}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {description}
-                              </p>
-                            </div>
-                          </li>
-                        )
-                      )}
+                      {QUICK_START_STEPS.map(({ icon: Icon, title, description }, index) => (
+                        <li key={title} className="flex items-start gap-3">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                            <Icon className="h-4 w-4" aria-hidden="true" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">
+                              Step {index + 1}: {title}
+                            </p>
+                            <p className="text-sm text-muted-foreground">{description}</p>
+                          </div>
+                        </li>
+                      ))}
                     </ol>
                   </motion.div>
                 </div>
@@ -892,6 +954,8 @@ const Index = () => {
             </div>
           ) : (
             <div className="space-y-10">
+              <ParseWarningsPanel warnings={parseWarnings} />
+
               <section className="grid gap-4 lg:grid-cols-3">
                 <QuickStatCard
                   icon={BookOpen}
@@ -1060,9 +1124,7 @@ const Index = () => {
                 >
                   <div className="sticky top-24 space-y-6">
                     <div className="glass-panel p-6">
-                      <h3 className="text-lg font-semibold text-foreground">
-                        Progress
-                      </h3>
+                      <h3 className="text-lg font-semibold text-foreground">Progress</h3>
                       <p className="text-sm text-muted-foreground">
                         Jump to any question or see which ones still need
                         attention.

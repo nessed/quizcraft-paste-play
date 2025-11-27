@@ -18,9 +18,26 @@ export interface Question {
   explanation?: string; // Optional explanation
 }
 
+export interface ParseWarning {
+  code:
+    | 'missing_question_text'
+    | 'duplicate_question_number'
+    | 'missing_answer'
+    | 'mcq_option_shortfall'
+    | 'unused_answer_key_entries'
+    | 'count_mismatch'
+    | 'orphan_answer'
+    | 'orphan_option'
+    | 'invalid_answer_key_pair'
+    | 'blank_markers_coerced_to_mcq';
+  message: string;
+  details?: string;
+}
+
 export interface QuizData {
   questions: Question[];
   title?: string;
+  warnings?: ParseWarning[];
 }
 
 export interface QuizResult {

@@ -6,21 +6,21 @@ import { toast } from '@/hooks/use-toast';
 
 const LLM_PROMPT = `Generate a plain-text quiz in this exact, parser-friendly format:
 
-- Start each question block with: "Question X of N" (on its own line), then the prompt.
+- Start each question block with: "Question X of N (Type: MCQ|Fill-in|True/False|Match)" (on its own line), then the prompt.
+- Only use blanks (___) when the Type is Fill-in. Do not add blanks to MCQ prompts.
 - MCQ options exactly like:
   A. option text
   B. option text
   C. option text
   D. option text
 - True/False accepted (use an 'Answer: True' or 'Answer: False' line).
-- Fill-in-the-Blank may include blanks (___) in the prompt; answers can be words or short phrases (e.g., 'Answer: decision making').
-- Match the following: state pairs under a single global mapping in either the question block or the final key, e.g., 'Answer Key: 1:C, 2:B, 3:A'. If using a final global key, nest it like '4:1:C 2:B 3:A' for Question 4.
+- Match: state pairs under a single mapping in either the question block or the final key, e.g., 'Answer: 1:C 2:B 3:A'. If using a final global key, nest it like '4:1:C 2:B 3:A' for Question 4.
 - Provide answers either per question as 'Answer: <letter/text>' OR as one final line: 'Answer Key: 1:B, 2:False, 3:decision making, 4:1:C 2:B 3:A, 5:D, ...'.
 - Plain text only. No markdown tables, no code fences. Separate questions with a blank line.
 
 Example format:
 
-Question 1 of 5
+Question 1 of 5 (Type: MCQ)
 What is the capital of France?
 A. London
 B. Paris
@@ -28,22 +28,22 @@ C. Berlin
 D. Madrid
 Answer: B
 
-Question 2 of 5
-Water boils at 100°C at sea level. (True or False)
+Question 2 of 5 (Type: True/False)
+Water boils at 100°C at sea level.
 Answer: True
 
-Question 3 of 5
+Question 3 of 5 (Type: Fill-in)
 Fill in the blank: The process of making choices is called _____.
 Answer: decision making
 
-Question 4 of 5
+Question 4 of 5 (Type: Match)
 Match the following programming languages with their primary use:
 1. Python
 2. SQL
 3. JavaScript
 Answer: 1:C 2:B 3:A
 
-Question 5 of 5
+Question 5 of 5 (Type: MCQ)
 Which data structure uses LIFO?
 A. Queue
 B. Stack
