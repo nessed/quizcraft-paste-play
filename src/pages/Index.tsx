@@ -41,26 +41,33 @@ const SETTINGS_KEY = 'quiz-runner-settings';
 const SOUND_PREF_KEY = 'quiz-runner-sound-enabled';
 
 const DEFAULT_SETTINGS: QuizSettingsType = {
-  mode: 'test',
+  mode: "test",
   timerEnabled: false,
   timerMinutes: 10,
 };
 
-const HERO_FEATURES: Array<{ icon: LucideIcon; title: string; description: string }> = [
+const HERO_FEATURES: Array<{
+  icon: LucideIcon;
+  title: string;
+  description: string;
+}> = [
   {
     icon: Wand2,
-    title: 'Paste anything',
-    description: 'Drop in classroom exams, certification drills, or AI-generated sets in seconds.',
+    title: "Paste anything",
+    description:
+      "Drop in classroom exams, certification drills, or AI-generated sets in seconds.",
   },
   {
     icon: Zap,
-    title: 'Adaptive practice',
-    description: 'Practice mode shows live feedback, while test mode keeps results until you submit.',
+    title: "Adaptive practice",
+    description:
+      "Practice mode shows live feedback, while test mode keeps results until you submit.",
   },
   {
     icon: Gauge,
-    title: 'Focus on mastery',
-    description: 'Flag tough questions, enable a timer, and review only the misses after grading.',
+    title: "Focus on mastery",
+    description:
+      "Flag tough questions, enable a timer, and review only the misses after grading.",
   },
 ];
 
@@ -103,12 +110,64 @@ C. Queue
 D. Graph
 Answer: C`;
 
+const QUICK_START_STEPS: Array<{
+  icon: LucideIcon;
+  title: string;
+  description: string;
+}> = [
+  {
+    icon: ClipboardList,
+    title: "Paste your quiz",
+    description:
+      "Copy any quiz text from exams, study guides, or AI-generated content.",
+  },
+  {
+    icon: CheckCircle,
+    title: "Parse questions",
+    description:
+      'Click "Parse Quiz" to automatically detect questions and answers.',
+  },
+  {
+    icon: Settings2,
+    title: "Choose mode",
+    description:
+      "Switch between practice mode (live feedback) or test mode (submit when ready).",
+  },
+  {
+    icon: PlayCircle,
+    title: "Start practicing",
+    description:
+      "Answer questions, flag difficult ones, and track your progress.",
+  },
+];
+
 type QuickStatCardProps = {
   icon: LucideIcon;
   label: string;
   value: string;
   hint?: string;
-  accent?: 'primary' | 'success' | 'warning';
+  accent?: "primary" | "success" | "warning";
+};
+
+type ParseState = "idle" | "parsing" | "success" | "error";
+
+const ctaContainerVariants = {
+  hidden: { opacity: 0, y: 16 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.5, staggerChildren: 0.08, delayChildren: 0.2 },
+  },
+};
+
+const ctaButtonVariants = {
+  hidden: { opacity: 0, y: 20, scale: 0.95 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { type: "spring", stiffness: 260, damping: 18 },
+  },
 };
 
 type ParseState = 'idle' | 'parsing' | 'success' | 'error';
@@ -165,7 +224,23 @@ const accentIconClasses: Record<NonNullable<QuickStatCardProps['accent']>, strin
   warning: 'bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-200',
 };
 
-const QuickStatCard = ({ icon: Icon, label, value, hint, accent = 'primary' }: QuickStatCardProps) => (
+const accentIconClasses: Record<
+  NonNullable<QuickStatCardProps["accent"]>,
+  string
+> = {
+  primary: "bg-primary/10 text-primary dark:bg-primary/15",
+  success: "bg-success/10 text-success dark:bg-success/20",
+  warning:
+    "bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-200",
+};
+
+const QuickStatCard = ({
+  icon: Icon,
+  label,
+  value,
+  hint,
+  accent = "primary",
+}: QuickStatCardProps) => (
   <motion.div
     initial={{ opacity: 0, y: 12 }}
     animate={{ opacity: 1, y: 0 }}
@@ -174,13 +249,19 @@ const QuickStatCard = ({ icon: Icon, label, value, hint, accent = 'primary' }: Q
   >
     <div className="absolute -top-16 right-0 h-24 w-24 rounded-full bg-primary/5 blur-3xl transition group-hover:bg-primary/10" />
     <div className="relative flex items-start gap-4">
-      <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${accentIconClasses[accent]}`}>
+      <div
+        className={`flex h-11 w-11 items-center justify-center rounded-xl ${accentIconClasses[accent]}`}
+      >
         <Icon className="h-5 w-5" />
       </div>
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground/80">{label}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground/80">
+          {label}
+        </p>
         <p className="text-xl font-semibold text-foreground">{value}</p>
-        {hint ? <p className="mt-1 text-sm text-muted-foreground">{hint}</p> : null}
+        {hint ? (
+          <p className="mt-1 text-sm text-muted-foreground">{hint}</p>
+        ) : null}
       </div>
     </div>
   </motion.div>
@@ -211,10 +292,12 @@ const ParseWarningsPanel = ({ warnings }: { warnings: ParseWarning[] }) => {
 };
 
 const Index = () => {
-  const [quizText, setQuizText] = useState('');
+  const [quizText, setQuizText] = useState("");
   const [quizData, setQuizData] = useState<QuizData | null>(null);
   const [isGraded, setIsGraded] = useState(false);
-  const [results, setResults] = useState<ReturnType<typeof gradeQuiz> | null>(null);
+  const [results, setResults] = useState<ReturnType<typeof gradeQuiz> | null>(
+    null
+  );
   const [settings, setSettings] = useState<QuizSettingsType>(DEFAULT_SETTINGS);
   const [reviewMode, setReviewMode] = useState(false);
   const [timerStarted, setTimerStarted] = useState(false);
@@ -326,9 +409,9 @@ const Index = () => {
         updateParseState('error');
         playError();
         toast({
-          title: 'No questions found',
-          description: 'Please check your quiz format and try again.',
-          variant: 'destructive',
+          title: "No questions found",
+          description: "Please check your quiz format and try again.",
+          variant: "destructive",
         });
         return;
       }
@@ -345,38 +428,56 @@ const Index = () => {
       }, 320);
 
       toast({
-        title: 'Quiz ready!',
-        description: `Loaded ${parsed.questions.length} question${parsed.questions.length > 1 ? 's' : ''}.`,
+        title: "Quiz ready!",
+        description: `Loaded ${parsed.questions.length} question${
+          parsed.questions.length > 1 ? "s" : ""
+        }.`,
       });
     } catch (error) {
       updateParseState('error');
       playError();
       toast({
-        title: 'Parse error',
-        description: 'Failed to understand the quiz text. Double-check the format.',
-        variant: 'destructive',
+        title: "Parse error",
+        description:
+          "Failed to understand the quiz text. Double-check the format.",
+        variant: "destructive",
       });
       setParseWarnings([]);
     }
   }, [playError, playPrimary, playSuccess, quizText, settings.timerEnabled, updateParseState]);
 
-  const evaluateAnswer = useCallback((question: Question, answer: string | string[]): boolean => {
-    if (question.type === 'match' && Array.isArray(question.correctAnswer) && Array.isArray(answer)) {
-      if (question.correctAnswer.length !== answer.length) {
-        return false;
+  const evaluateAnswer = useCallback(
+    (question: Question, answer: string | string[]): boolean => {
+      if (
+        question.type === "match" &&
+        Array.isArray(question.correctAnswer) &&
+        Array.isArray(answer)
+      ) {
+        if (question.correctAnswer.length !== answer.length) {
+          return false;
+        }
+
+        return question.correctAnswer.every(
+          (expected, index) =>
+            expected.toLowerCase().trim() ===
+            answer[index]?.toLowerCase().trim()
+        );
       }
 
-      return question.correctAnswer.every(
-        (expected, index) => expected.toLowerCase().trim() === answer[index]?.toLowerCase().trim(),
-      );
-    }
+      if (
+        typeof question.correctAnswer === "string" &&
+        typeof answer === "string"
+      ) {
+        return (
+          question.correctAnswer.toLowerCase().trim() ===
+          answer.toLowerCase().trim()
+        );
+      }
 
-    if (typeof question.correctAnswer === 'string' && typeof answer === 'string') {
-      return question.correctAnswer.toLowerCase().trim() === answer.toLowerCase().trim();
-    }
-
-    return false;
-  }, []);
+      return false;
+    },
+    []
+  );
 
   const handleAnswer = useCallback(
     (questionId: string, answer: string | string[]) => {
@@ -474,14 +575,16 @@ const Index = () => {
       return;
     }
 
-    const unansweredCount = quizData.questions.filter((question) => !question.userAnswer).length;
+    const unansweredCount = quizData.questions.filter(
+      (question) => !question.userAnswer
+    ).length;
 
     if (unansweredCount > 0) {
       playError();
       toast({
-        title: 'Incomplete quiz',
+        title: "Incomplete quiz",
         description: `Please answer all questions (${unansweredCount} remaining).`,
-        variant: 'destructive',
+        variant: "destructive",
       });
       return;
     }
@@ -494,7 +597,7 @@ const Index = () => {
     playAchievement();
 
     toast({
-      title: 'Quiz graded!',
+      title: "Quiz graded!",
       description: `You scored ${gradeResults.score}%.`,
     });
   }, [playAchievement, playError, quizData]);
@@ -512,8 +615,8 @@ const Index = () => {
     playError();
 
     toast({
-      title: 'Time is up',
-      description: 'Your responses were submitted automatically.',
+      title: "Time is up",
+      description: "Your responses were submitted automatically.",
     });
   }, [playError, quizData]);
 
@@ -533,8 +636,9 @@ const Index = () => {
     localStorage.removeItem(STORAGE_KEY);
     playPrimary();
     toast({
-      title: 'Workspace cleared',
-      description: 'Start fresh or load the sample quiz to explore features faster.',
+      title: "Workspace cleared",
+      description:
+        "Start fresh or load the sample quiz to explore features faster.",
     });
   }, [playPrimary, updateParseState]);
 
@@ -557,8 +661,9 @@ const Index = () => {
     setTimerStarted(false);
     playPrimary();
     toast({
-      title: 'Sample quiz loaded',
-      description: 'Hit "Parse Quiz" to try the workflow with curated questions.',
+      title: "Sample quiz loaded",
+      description:
+        'Hit "Parse Quiz" to try the workflow with curated questions.',
     });
   }, [playPrimary, updateParseState]);
 
@@ -569,7 +674,9 @@ const Index = () => {
 
     if (reviewMode && results) {
       return quizData.questions.filter((question) => {
-        const answer = results.answers.find((entry) => entry.questionId === question.id);
+        const answer = results.answers.find(
+          (entry) => entry.questionId === question.id
+        );
         return answer && !answer.isCorrect;
       });
     }
@@ -581,7 +688,10 @@ const Index = () => {
     if (!quizData) {
       return 0;
     }
-    return quizData.questions.reduce((count, question) => count + (question.userAnswer ? 1 : 0), 0);
+    return quizData.questions.reduce(
+      (count, question) => count + (question.userAnswer ? 1 : 0),
+      0
+    );
   }, [quizData]);
 
   const flaggedCount = useMemo(() => {
@@ -592,7 +702,9 @@ const Index = () => {
   }, [quizData]);
 
   const totalQuestions = quizData?.questions.length ?? 0;
-  const completionPercent = totalQuestions ? Math.round((answeredCount / totalQuestions) * 100) : 0;
+  const completionPercent = totalQuestions
+    ? Math.round((answeredCount / totalQuestions) * 100)
+    : 0;
 
   const accuracyPercent = useMemo(() => {
     if (!quizData) {
@@ -601,12 +713,16 @@ const Index = () => {
     if (isGraded && results) {
       return results.score;
     }
-    if (settings.mode === 'practice') {
-      const attempted = quizData.questions.filter((question) => question.userAnswer).length;
+    if (settings.mode === "practice") {
+      const attempted = quizData.questions.filter(
+        (question) => question.userAnswer
+      ).length;
       if (!attempted) {
         return null;
       }
-      const correct = quizData.questions.filter((question) => question.isAnsweredCorrectly).length;
+      const correct = quizData.questions.filter(
+        (question) => question.isAnsweredCorrectly
+      ).length;
       return Math.round((correct / attempted) * 100);
     }
     return null;
@@ -621,7 +737,7 @@ const Index = () => {
         className="pointer-events-none absolute -top-32 left-1/2 h-72 w-[640px] -translate-x-1/2 rounded-[50%] bg-primary/20 blur-3xl"
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.8, ease: 'easeOut' }}
+        transition={{ duration: 0.8, ease: "easeOut" }}
       />
       <motion.div
         className="pointer-events-none absolute -bottom-24 right-12 h-80 w-80 rounded-full bg-primary/10 blur-3xl"
@@ -638,8 +754,12 @@ const Index = () => {
                 QR
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary/80">Quiz Runner</p>
-                <p className="text-sm text-muted-foreground">Transform pasted exams into a polished practice hub.</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary/80">
+                  Quiz Runner
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Transform pasted exams into a polished practice hub.
+                </p>
               </div>
             </div>
 
@@ -661,7 +781,12 @@ const Index = () => {
                 Load demo quiz
               </Button>
               <QuizSettings settings={settings} onChange={setSettings} />
-              <Button variant="outline" size="sm" onClick={handleReset} disabled={!canReset}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleReset}
+                disabled={!canReset}
+              >
                 <RotateCcw className="mr-2 h-4 w-4" />
                 Reset
               </Button>
@@ -777,15 +902,21 @@ const Index = () => {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <h3 className="text-lg font-semibold text-foreground">Tune your run</h3>
+                        <h3 className="text-lg font-semibold text-foreground">
+                          Tune your run
+                        </h3>
                         <p className="text-sm text-muted-foreground">
-                          Switch between practice and test mode, or add a countdown timer before parsing.
+                          Switch between practice and test mode, or add a
+                          countdown timer before parsing.
                         </p>
                       </div>
                       <Zap className="h-5 w-5 text-primary" />
                     </div>
                     <div className="mt-4">
-                      <QuizSettings settings={settings} onChange={setSettings} />
+                      <QuizSettings
+                        settings={settings}
+                        onChange={setSettings}
+                      />
                     </div>
                   </motion.div>
 
@@ -830,27 +961,41 @@ const Index = () => {
                   icon={BookOpen}
                   label="Progress"
                   value={`${answeredCount}/${totalQuestions}`}
-                  hint={totalQuestions ? `${completionPercent}% complete` : 'Awaiting responses'}
+                  hint={
+                    totalQuestions
+                      ? `${completionPercent}% complete`
+                      : "Awaiting responses"
+                  }
                 />
                 <QuickStatCard
                   icon={TimerIcon}
                   label="Timer"
                   value={
                     settings.timerEnabled
-                      ? `${settings.timerMinutes} minute${settings.timerMinutes === 1 ? '' : 's'}`
-                      : 'Timer off'
+                      ? `${settings.timerMinutes} minute${
+                          settings.timerMinutes === 1 ? "" : "s"
+                        }`
+                      : "Timer off"
                   }
                   hint={
-                    settings.timerEnabled ? (timerStarted ? 'Counting down' : 'Paused') : 'Enable the timer in settings'
+                    settings.timerEnabled
+                      ? timerStarted
+                        ? "Counting down"
+                        : "Paused"
+                      : "Enable the timer in settings"
                   }
-                  accent={settings.timerEnabled ? 'warning' : 'primary'}
+                  accent={settings.timerEnabled ? "warning" : "primary"}
                 />
                 <QuickStatCard
                   icon={Flag}
                   label="Flags"
-                  value={flaggedCount ? `${flaggedCount}` : 'None'}
-                  hint={flaggedCount ? 'Review flagged questions later' : 'Mark questions to revisit'}
-                  accent={flaggedCount ? 'primary' : 'success'}
+                  value={flaggedCount ? `${flaggedCount}` : "None"}
+                  hint={
+                    flaggedCount
+                      ? "Review flagged questions later"
+                      : "Mark questions to revisit"
+                  }
+                  accent={flaggedCount ? "primary" : "success"}
                 />
               </section>
 
@@ -866,7 +1011,9 @@ const Index = () => {
                         <div className="flex flex-wrap items-center gap-4">
                           <div>
                             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground/80">
-                              {settings.mode === 'practice' ? 'Practice mode' : 'Test mode'}
+                              {settings.mode === "practice"
+                                ? "Practice mode"
+                                : "Test mode"}
                             </p>
                             <p className="text-2xl font-semibold text-foreground">
                               {answeredCount} / {totalQuestions} answered
@@ -875,16 +1022,24 @@ const Index = () => {
                           {settings.timerEnabled && timerStarted && (
                             <div className="flex items-center gap-3 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3">
                               <TimerIcon className="h-5 w-5 text-primary" />
-                              <QuizTimer durationMinutes={settings.timerMinutes} onTimeUp={handleTimeUp} isPaused={false} />
+                              <QuizTimer
+                                durationMinutes={settings.timerMinutes}
+                                onTimeUp={handleTimeUp}
+                                isPaused={false}
+                              />
                             </div>
                           )}
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          <Button onClick={handleReset} variant="outline" size="sm">
+                          <Button
+                            onClick={handleReset}
+                            variant="outline"
+                            size="sm"
+                          >
                             <RotateCcw className="mr-2 h-4 w-4" />
                             Reset
                           </Button>
-                          {settings.mode === 'test' && (
+                          {settings.mode === "test" && (
                             <Button onClick={handleSubmit} size="sm">
                               <CheckCircle className="mr-2 h-4 w-4" />
                               Submit quiz
@@ -909,7 +1064,11 @@ const Index = () => {
                           onReset={handleReset}
                         />
                         {results.correctAnswers < results.totalQuestions && (
-                          <Button onClick={handleReviewWrong} variant="outline" className="mt-4 w-full">
+                          <Button
+                            onClick={handleReviewWrong}
+                            variant="outline"
+                            className="mt-4 w-full"
+                          >
                             <Eye className="mr-2 h-4 w-4" />
                             Review incorrect answers
                           </Button>
@@ -928,8 +1087,9 @@ const Index = () => {
                           className="rounded-2xl border border-destructive/30 bg-destructive/10 p-4"
                         >
                           <p className="text-sm font-semibold text-destructive-foreground">
-                            Reviewing {filteredQuestions.length} incorrect answer
-                            {filteredQuestions.length !== 1 ? 's' : ''}.
+                            Reviewing {filteredQuestions.length} incorrect
+                            answer
+                            {filteredQuestions.length !== 1 ? "s" : ""}.
                           </p>
                         </motion.div>
                       )}
@@ -942,11 +1102,13 @@ const Index = () => {
                           onAnswer={handleAnswer}
                           onFlag={handleFlag}
                           isGraded={isGraded}
-                          isPracticeMode={settings.mode === 'practice'}
+                          isPracticeMode={settings.mode === "practice"}
                           showFeedback={!!question.userAnswer}
                           isCorrect={
                             isGraded
-                              ? results?.answers.find((answer) => answer.questionId === question.id)?.isCorrect
+                              ? results?.answers.find(
+                                  (answer) => answer.questionId === question.id
+                                )?.isCorrect
                               : undefined
                           }
                         />
@@ -964,26 +1126,31 @@ const Index = () => {
                     <div className="glass-panel p-6">
                       <h3 className="text-lg font-semibold text-foreground">Progress</h3>
                       <p className="text-sm text-muted-foreground">
-                        Jump to any question or see which ones still need attention.
+                        Jump to any question or see which ones still need
+                        attention.
                       </p>
                       <div className="mt-4">
                         <QuizProgress questions={quizData.questions} />
                       </div>
                     </div>
 
-                    {typeof accuracyPercent === 'number' && (
+                    {typeof accuracyPercent === "number" && (
                       <div className="rounded-3xl border border-success/20 bg-success/10 p-5 shadow-lg backdrop-blur">
                         <div className="flex items-center gap-3">
                           <CheckCircle className="h-5 w-5 text-success" />
                           <div>
-                            <p className="text-sm font-semibold text-success">Accuracy so far</p>
-                            <p className="text-xl font-semibold text-success">{accuracyPercent}%</p>
+                            <p className="text-sm font-semibold text-success">
+                              Accuracy so far
+                            </p>
+                            <p className="text-xl font-semibold text-success">
+                              {accuracyPercent}%
+                            </p>
                           </div>
                         </div>
                         <p className="mt-3 text-sm text-success/80">
                           {isGraded
-                            ? 'Final score based on submitted answers.'
-                            : 'Practice feedback updates as you answer.'}
+                            ? "Final score based on submitted answers."
+                            : "Practice feedback updates as you answer."}
                         </p>
                       </div>
                     )}
@@ -996,7 +1163,8 @@ const Index = () => {
 
         <footer className="border-t border-border/70 bg-background/80 py-8 backdrop-blur">
           <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-            Quiz Runner - Built with React, TypeScript, and Framer Motion - You are ready to ship quizzes to learners.
+            Quiz Runner - Built with React, TypeScript, and Framer Motion - You
+            are ready to ship quizzes to learners.
           </div>
         </footer>
       </div>
